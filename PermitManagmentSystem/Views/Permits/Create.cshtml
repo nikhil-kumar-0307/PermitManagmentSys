@@ -1,0 +1,25 @@
+﻿@model PermitManagmentSystem.Models.DTOs.PermitDto
+@{
+    Layout = "~/Views/Shared/_OperationLayout.cshtml";
+    ViewBag.Title = "Add permit";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Add permit</h1>
+        <p>Enter the permit details and attach the signed document.</p>
+    </div>
+</div>
+
+<div class="form-card">
+    @using (Html.BeginForm("Create", "Permits", FormMethod.Post, new { enctype = "multipart/form-data", novalidate = "novalidate" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.Partial("_PermitFields", Model)
+
+        <div class="form-actions">
+            <button type="submit" class="btn">Save permit</button>
+            <a class="btn btn-ghost" href="@Url.Action("Index", "Permits")">Cancel</a>
+        </div>
+    }
+</div>

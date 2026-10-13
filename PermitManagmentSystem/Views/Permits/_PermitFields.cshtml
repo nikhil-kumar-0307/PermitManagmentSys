@@ -1,0 +1,70 @@
+﻿@model PermitManagmentSystem.Models.DTOs.PermitDto
+
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="alert" role="alert">Some details need fixing. Check the highlighted fields.</div>
+}
+
+<div class="fields">
+    <div class="f">
+        @Html.LabelFor(m => m.PermitNo)
+        @Html.TextBoxFor(m => m.PermitNo, new { maxlength = 50, autofocus = "autofocus" })
+        @Html.ValidationMessageFor(m => m.PermitNo)
+    </div>
+
+    <div class="f">
+        @Html.LabelFor(m => m.IssueDate)
+        @Html.TextBoxFor(m => m.IssueDate, "{0:yyyy-MM-dd}", new { type = "date" })
+        @Html.ValidationMessageFor(m => m.IssueDate)
+    </div>
+
+    <div class="f">
+        @Html.LabelFor(m => m.WorkLocation)
+        @Html.TextBoxFor(m => m.WorkLocation, new { maxlength = 200 })
+        @Html.ValidationMessageFor(m => m.WorkLocation)
+    </div>
+
+    <div class="f">
+        @Html.LabelFor(m => m.Department)
+        @Html.TextBoxFor(m => m.Department, new { maxlength = 100 })
+        @Html.ValidationMessageFor(m => m.Department)
+    </div>
+
+    <div class="f">
+        @Html.LabelFor(m => m.PermitIssueBy)
+        @Html.TextBoxFor(m => m.PermitIssueBy, new { maxlength = 150 })
+        @Html.ValidationMessageFor(m => m.PermitIssueBy)
+    </div>
+
+    <div class="f">
+        @Html.LabelFor(m => m.PermitIssueTo)
+        @Html.TextBoxFor(m => m.PermitIssueTo, new { maxlength = 150 })
+        @Html.ValidationMessageFor(m => m.PermitIssueTo)
+    </div>
+
+    <div class="f full">
+        @Html.LabelFor(m => m.Description)
+        @Html.TextAreaFor(m => m.Description, new { maxlength = 1000 })
+        @Html.ValidationMessageFor(m => m.Description)
+    </div>
+
+    <div class="f full">
+        <label for="Attachment">Attachment</label>
+
+        @if (!string.IsNullOrEmpty(Model.ExistingFileName))
+        {
+            <div class="current-file">
+                <span>
+                    Current file:
+                    <a href="@Url.Action("Download", "Permits", new { id = Model.Id })">@Model.ExistingFileName</a>
+                </span>
+                <label>@Html.CheckBoxFor(m => m.RemoveAttachment) Remove this file</label>
+            </div>
+            <div class="hint">Choose a new file below to replace it.</div>
+        }
+
+        <input type="file" id="Attachment" name="Attachment" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
+        <div class="hint">PDF, Word, Excel, JPG or PNG. Up to 5 MB.</div>
+        @Html.ValidationMessageFor(m => m.Attachment)
+    </div>
+</div>

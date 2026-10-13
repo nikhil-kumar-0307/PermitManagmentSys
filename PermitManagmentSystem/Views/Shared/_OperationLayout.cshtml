@@ -1,0 +1,49 @@
+﻿@{
+    var controller = (string)ViewContext.RouteData.Values["controller"];
+    var action = (string)ViewContext.RouteData.Values["action"];
+    Func<string, bool> isPermitsPage = a => controller == "Permits" && a == action;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewBag.Title - Permit Management</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="~/Content/operation.css" rel="stylesheet" />
+</head>
+<body>
+    <div class="shell">
+        <aside class="side">
+            <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Permit Management</div>
+
+            <nav class="nav" aria-label="Operation">
+                <a href="@Url.Action("Dashboard", "Operation")" class="@(controller == "Operation" ? "active" : "")">Dashboard</a>
+                <a href="@Url.Action("Index", "Permits")" class="@(controller == "Permits" && (action == "Index" || action == "Edit") ? "active" : "")">All permits</a>
+                <a href="@Url.Action("Create", "Permits")" class="@(isPermitsPage("Create") ? "active" : "")">Add permit</a>
+            </nav>
+
+            <div class="who">
+                <strong>@User.Identity.Name</strong>
+                <span>Operation</span>
+                @using (Html.BeginForm("Logout", "Account", FormMethod.Post))
+                {
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="link-btn">Sign out</button>
+                }
+            </div>
+        </aside>
+
+        <main class="main">
+            @if (TempData["Success"] != null)
+            {
+                <div class="flash" role="status">@TempData["Success"]</div>
+            }
+            @RenderBody()
+        </main>
+    </div>
+    @RenderSection("scripts", required: false)
+</body>
+</html>

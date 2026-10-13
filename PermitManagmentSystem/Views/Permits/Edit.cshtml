@@ -1,0 +1,27 @@
+﻿@model PermitManagmentSystem.Models.DTOs.PermitDto
+@{
+    Layout = "~/Views/Shared/_OperationLayout.cshtml";
+    ViewBag.Title = "Edit permit";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Edit permit</h1>
+        <p>@Model.PermitNo</p>
+    </div>
+</div>
+
+<div class="form-card">
+    @using (Html.BeginForm("Edit", "Permits", new { id = Model.Id }, FormMethod.Post, new { enctype = "multipart/form-data", novalidate = "novalidate" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(m => m.Id)
+        @Html.HiddenFor(m => m.ExistingFileName)
+        @Html.Partial("_PermitFields", Model)
+
+        <div class="form-actions">
+            <button type="submit" class="btn">Save changes</button>
+            <a class="btn btn-ghost" href="@Url.Action("Index", "Permits")">Cancel</a>
+        </div>
+    }
+</div>

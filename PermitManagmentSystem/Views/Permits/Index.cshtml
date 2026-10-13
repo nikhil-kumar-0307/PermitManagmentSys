@@ -1,0 +1,120 @@
+﻿@model List<PermitManagmentSystem.Models.DTOs.PermitListDto>
+@{
+    Layout = "~/Views/Shared/_OperationLayout.cshtml";
+    ViewBag.Title = "All permits";
+    var query = (string)ViewBag.Query;
+}
+
+<div class="page-head">
+    <div>
+        <h1>All permits</h1>
+        <p>@Model.Count @(Model.Count == 1 ? "permit" : "permits")@(string.IsNullOrEmpty(query) ? "" : " matching \"" + query + "\"")</p>
+    </div>
+    <a class="btn" href="@Url.Action("Create", "Permits")">Add permit</a>
+</div>
+
+<form method="get" action="@Url.Action("Index", "Permits")" class="toolbar" role="search">
+    <input type="search" name="q" value="@query" placeholder="Search permit no, location, department or name" aria-label="Search permits" />
+    <button type="submit" class="btn btn-ghost">Search</button>
+    @if (!string.IsNullOrEmpty(query))
+    {
+        <a class="btn btn-ghost" href="@Url.Action("Index", "Permits")">Clear</a>
+    }
+</form>
+
+@if (!Model.Any())
+{
+    <div class="table-wrap">
+        <div class="empty">
+            @if (string.IsNullOrEmpty(query))
+            {
+                <h2>No permits yet</h2>
+                <p>Add your first permit to start tracking work.</p>
+                <a class="btn" href="@Url.Action("Create", "Permits")">Add permit</a>
+            }
+            else
+            {
+                <h2>No permits found</h2>
+                <p>Try a different permit no, location or name.</p>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Permit no</th>
+                    <th>Work location</th>
+                    <th>Department</th>
+                    <th>Description</th>
+                    <th>Issued by</th>
+                    <th>Issued to</th>
+                    <th>Date</th>
+                    <th>Attachment</th>
+                    <th><span class="sr-only" style="position:absolute;left:-9999px">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model)
+                {
+                    <tr>
+                        <td class="no">@p.PermitNo</td>
+                        <td>@p.WorkLocation</td>
+                        <td>@p.Department</td>
+                        <td class="desc" title="@p.Description">@(p.Description != null && p.Description.Length > 70 ? p.Description.Substring(0, 70) + "..." : p.Description)</td>
+                        <td>@p.PermitIssueBy</td>
+                        <td>@p.PermitIssueTo</td>
+                        <td class="date">@p.IssueDate.ToString("dd MMM yyyy")</td>
+                        <td>
+                            @if (p.HasAttachment)
+                            {
+                                <a href="@Url.Action("Download", "Permits", new { id = p.Id })">@p.AttachmentFileName</a>
+                            }
+                            else
+                            {
+                                <span class="muted">None</span>
+                            }
+                        </td>
+                        <td class="act">
+                            <a href="@Url.Action("Edit", "Permits", new { id = p.Id })">Edit</a>
+                            <button type="button" class="link-btn danger-link" data-delete="@p.Id" data-no="@p.PermitNo">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<dialog id="deleteDialog" aria-labelledby="deleteTitle">
+    @using (Html.BeginForm("Delete", "Permits", FormMethod.Post, new { @class = "dlg" }))
+    {
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="id" id="deleteId" />
+        <h2 id="deleteTitle">Delete permit <span id="deleteNo"></span>?</h2>
+        <p>The permit and its attachment will be removed permanently. This cannot be undone.</p>
+        <div class="row">
+            <button type="button" class="btn btn-ghost" id="deleteCancel">Cancel</button>
+            <button type="submit" class="btn btn-danger">Delete permit</button>
+        </div>
+    }
+</dialog>
+
+@section scripts {
+    <script>
+        (function () {
+            var dlg = document.getElementById("deleteDialog");
+            document.querySelectorAll("[data-delete]").forEach(function (b) {
+                b.addEventListener("click", function () {
+                    document.getElementById("deleteId").value = b.getAttribute("data-delete");
+                    document.getElementById("deleteNo").textContent = b.getAttribute("data-no");
+                    dlg.showModal();
+                });
+            });
+            document.getElementById("deleteCancel").addEventListener("click", function () { dlg.close(); });
+        })();
+    </script>
+}

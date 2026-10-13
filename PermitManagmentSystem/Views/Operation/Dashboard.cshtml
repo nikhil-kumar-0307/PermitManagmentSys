@@ -1,0 +1,79 @@
+﻿@model PermitManagmentSystem.Models.DTOs.OperationDashboardDto
+@{
+    Layout = "~/Views/Shared/_OperationLayout.cshtml";
+    ViewBag.Title = "Dashboard";
+    var max = Model.ByDepartment.Any() ? Model.ByDepartment.Max(d => d.Count) : 1;
+}
+
+<div class="page-head">
+    <div>
+        <h1>Operation dashboard</h1>
+        <p>@DateTime.Today.ToString("dddd, dd MMMM yyyy")</p>
+    </div>
+    <a class="btn" href="@Url.Action("Create", "Permits")">Add permit</a>
+</div>
+
+<section class="stats" aria-label="Permit summary">
+    <div class="stat"><div class="n">@Model.TotalPermits</div><div class="l">Total permits</div></div>
+    <div class="stat"><div class="n">@Model.IssuedToday</div><div class="l">Issued today</div></div>
+    <div class="stat"><div class="n">@Model.IssuedThisMonth</div><div class="l">Issued this month</div></div>
+    <div class="stat @(Model.WithoutAttachment > 0 ? "warn" : "")"><div class="n">@Model.WithoutAttachment</div><div class="l">Without attachment</div></div>
+</section>
+
+<div class="grid-2">
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Latest permits</h2>
+            <a href="@Url.Action("Index", "Permits")">View all permits</a>
+        </div>
+
+        @if (!Model.Recent.Any())
+        {
+            <div class="empty">
+                <h2>No permits yet</h2>
+                <p>Permits you add will show up here.</p>
+                <a class="btn" href="@Url.Action("Create", "Permits")">Add the first permit</a>
+            </div>
+        }
+        else
+        {
+            <div class="table-wrap" style="border:0;border-radius:0">
+                <table>
+                    <thead><tr><th>Permit no</th><th>Work location</th><th>Department</th><th>Issued to</th><th>Date</th></tr></thead>
+                    <tbody>
+                        @foreach (var p in Model.Recent)
+                        {
+                            <tr>
+                                <td class="no"><a href="@Url.Action("Edit", "Permits", new { id = p.Id })">@p.PermitNo</a></td>
+                                <td>@p.WorkLocation</td>
+                                <td>@p.Department</td>
+                                <td>@p.PermitIssueTo</td>
+                                <td class="date">@p.IssueDate.ToString("dd MMM yyyy")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><h2>Permits by department</h2></div>
+        @if (!Model.ByDepartment.Any())
+        {
+            <div class="empty">Nothing to show yet.</div>
+        }
+        else
+        {
+            <ul class="bars">
+                @foreach (var d in Model.ByDepartment)
+                {
+                    <li>
+                        <div class="top"><span>@d.Name</span><strong>@d.Count</strong></div>
+                        <div class="track"><div class="fill" style="width:@(d.Count * 100 / max)%"></div></div>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</div>
