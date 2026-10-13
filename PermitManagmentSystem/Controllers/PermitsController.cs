@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Web;
@@ -15,6 +16,7 @@ namespace PermitManagmentSystem.Controllers
     public class PermitsController : Controller
     {
         private readonly ApplicationDbContext _db = new ApplicationDbContext();
+        private readonly QmsDbContext _qms = new QmsDbContext();   // departments live in the QMS database
 
         private static readonly string[] AllowedExtensions =
             { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".jpg", ".jpeg", ".png" };
@@ -29,10 +31,17 @@ namespace PermitManagmentSystem.Controllers
             if (!string.IsNullOrWhiteSpace(q))
             {
                 q = q.Trim();
+
+                // Department names are in the QMS database, so find the matching ids there first
+                var deptIds = _qms.Departments
+                    .Where(d => d.Name.Contains(q) || d.Code.Contains(q))
+                    .Select(d => d.Id)
+                    .ToList();
+
                 query = query.Where(p =>
                     p.PermitNo.Contains(q) ||
                     p.WorkLocation.Contains(q) ||
-                    p.Department.Contains(q) ||
+                    deptIds.Contains(p.DepartmentId) ||
                     p.PermitIssueBy.Contains(q) ||
                     p.PermitIssueTo.Contains(q));
             }
@@ -44,7 +53,7 @@ namespace PermitManagmentSystem.Controllers
                     Id = p.Id,
                     PermitNo = p.PermitNo,
                     WorkLocation = p.WorkLocation,
-                    Department = p.Department,
+                    DepartmentId = p.DepartmentId,
                     Description = p.Description,
                     PermitIssueBy = p.PermitIssueBy,
                     PermitIssueTo = p.PermitIssueTo,
@@ -52,6 +61,10 @@ namespace PermitManagmentSystem.Controllers
                     HasAttachment = p.AttachmentStoredName != null,
                     AttachmentFileName = p.AttachmentFileName
                 }).ToList();
+
+            var names = _qms.GetDepartmentNames();
+            foreach (var row in list)
+                row.Department = QmsDbContext.NameOf(names, row.DepartmentId);
 
             ViewBag.Query = q;
             return View(list);
@@ -61,7 +74,11 @@ namespace PermitManagmentSystem.Controllers
         // GET: /Permits/Create
         public ActionResult Create()
         {
-            return View(new PermitDto { IssueDate = DateTime.Today });
+            return View(new PermitDto
+            {
+                IssueDate = DateTime.Today,
+                Departments = DepartmentOptions(null)
+            });
         }
 
         // POST: /Permits/Create
@@ -73,16 +90,26 @@ namespace PermitManagmentSystem.Controllers
             if (_db.Permits.Any(p => p.PermitNo == permitNo))
                 ModelState.AddModelError("PermitNo", "This permit no already exists.");
 
+            if (model.DepartmentId.HasValue)
+            {
+                var deptId = model.DepartmentId.Value;
+                if (!_qms.Departments.Any(d => d.Id == deptId && d.IsActive))
+                    ModelState.AddModelError("DepartmentId", "Select a department from the list.");
+            }
+
             ValidateFile(model.Attachment);
 
             if (!ModelState.IsValid)
+            {
+                model.Departments = DepartmentOptions(model.DepartmentId);
                 return View(model);
+            }
 
             var permit = new Permit
             {
                 PermitNo = permitNo,
                 WorkLocation = model.WorkLocation.Trim(),
-                Department = model.Department.Trim(),
+                DepartmentId = model.DepartmentId.Value,
                 Description = model.Description.Trim(),
                 PermitIssueBy = model.PermitIssueBy.Trim(),
                 PermitIssueTo = model.PermitIssueTo.Trim(),
@@ -111,12 +138,16 @@ namespace PermitManagmentSystem.Controllers
             var permit = _db.Permits.Find(id);
             if (permit == null) return HttpNotFound();
 
+            // 0 = an old permit created before departments were linked: force a choice
+            int? selected = permit.DepartmentId == 0 ? (int?)null : permit.DepartmentId;
+
             return View(new PermitDto
             {
                 Id = permit.Id,
                 PermitNo = permit.PermitNo,
                 WorkLocation = permit.WorkLocation,
-                Department = permit.Department,
+                DepartmentId = selected,
+                Departments = DepartmentOptions(selected),
                 Description = permit.Description,
                 PermitIssueBy = permit.PermitIssueBy,
                 PermitIssueTo = permit.PermitIssueTo,
@@ -138,17 +169,26 @@ namespace PermitManagmentSystem.Controllers
             if (_db.Permits.Any(p => p.PermitNo == permitNo && p.Id != id))
                 ModelState.AddModelError("PermitNo", "This permit no already exists.");
 
+            if (model.DepartmentId.HasValue)
+            {
+                var deptId = model.DepartmentId.Value;
+                var current = permit.DepartmentId;   // keep allowing the permit's current department even if now inactive
+                if (!_qms.Departments.Any(d => d.Id == deptId && (d.IsActive || d.Id == current)))
+                    ModelState.AddModelError("DepartmentId", "Select a department from the list.");
+            }
+
             ValidateFile(model.Attachment);
 
             if (!ModelState.IsValid)
             {
                 model.ExistingFileName = permit.AttachmentFileName;
+                model.Departments = DepartmentOptions(model.DepartmentId ?? permit.DepartmentId);
                 return View(model);
             }
 
             permit.PermitNo = permitNo;
             permit.WorkLocation = model.WorkLocation.Trim();
-            permit.Department = model.Department.Trim();
+            permit.DepartmentId = model.DepartmentId.Value;
             permit.Description = model.Description.Trim();
             permit.PermitIssueBy = model.PermitIssueBy.Trim();
             permit.PermitIssueTo = model.PermitIssueTo.Trim();
@@ -210,6 +250,26 @@ namespace PermitManagmentSystem.Controllers
             return File(path, MimeMapping.GetMimeMapping(permit.AttachmentFileName), permit.AttachmentFileName);
         }
 
+        // ---------------------------------------------------------------- department drop-down
+        // Active departments from QMS, plus the currently selected one (even if it was deactivated later)
+        private List<SelectListItem> DepartmentOptions(int? selectedId)
+        {
+            var sel = selectedId ?? -1;
+
+            return _qms.Departments
+                .Where(d => d.IsActive || d.Id == sel)
+                .OrderBy(d => d.Name)
+                .Select(d => new { d.Id, d.Name, d.Code })
+                .ToList()
+                .Select(d => new SelectListItem
+                {
+                    Value = d.Id.ToString(),
+                    Text = string.IsNullOrEmpty(d.Code) ? d.Name : d.Name + " (" + d.Code + ")",
+                    Selected = d.Id == sel
+                })
+                .ToList();
+        }
+
         // ---------------------------------------------------------------- file helpers
         // Files live in App_Data, which IIS never serves directly,
         // so they can only be opened through Download() above (login required).
@@ -255,7 +315,7 @@ namespace PermitManagmentSystem.Controllers
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) _db.Dispose();
+            if (disposing) { _db.Dispose(); _qms.Dispose(); }
             base.Dispose(disposing);
         }
     }

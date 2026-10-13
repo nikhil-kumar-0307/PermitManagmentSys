@@ -25,9 +25,9 @@
     </div>
 
     <div class="f">
-        @Html.LabelFor(m => m.Department)
-        @Html.TextBoxFor(m => m.Department, new { maxlength = 100 })
-        @Html.ValidationMessageFor(m => m.Department)
+        @Html.LabelFor(m => m.DepartmentId)
+        @Html.DropDownListFor(m => m.DepartmentId, Model.Departments, "Select department")
+        @Html.ValidationMessageFor(m => m.DepartmentId)
     </div>
 
     <div class="f">

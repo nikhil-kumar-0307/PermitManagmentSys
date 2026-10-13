@@ -16,8 +16,9 @@ namespace PermitManagmentSystem.Models
         [Required, StringLength(200)]
         public string WorkLocation { get; set; }
 
-        [Required, StringLength(100)]
-        public string Department { get; set; }
+        // Points to Departments.Id in the QMS database.
+        // (No SQL foreign key - it is a different database - so the controller checks it.)
+        public int DepartmentId { get; set; }
 
         [Required, StringLength(1000)]
         public string Description { get; set; }

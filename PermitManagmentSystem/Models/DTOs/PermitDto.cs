@@ -1,6 +1,8 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 using System.Web;
+using System.Web.Mvc;
 
 namespace PermitManagmentSystem.Models.DTOs
 {
@@ -19,9 +21,12 @@ namespace PermitManagmentSystem.Models.DTOs
         [Display(Name = "Work location")]
         public string WorkLocation { get; set; }
 
-        [Required(ErrorMessage = "Department is required")]
-        [StringLength(100, ErrorMessage = "Department can be up to 100 characters")]
-        public string Department { get; set; }
+        [Required(ErrorMessage = "Select a department")]
+        [Display(Name = "Department")]
+        public int? DepartmentId { get; set; }
+
+        // Drop-down items loaded from the QMS database
+        public List<SelectListItem> Departments { get; set; } = new List<SelectListItem>();
 
         [Required(ErrorMessage = "Description is required")]
         [StringLength(1000, ErrorMessage = "Description can be up to 1000 characters")]
@@ -56,7 +61,8 @@ namespace PermitManagmentSystem.Models.DTOs
         public int Id { get; set; }
         public string PermitNo { get; set; }
         public string WorkLocation { get; set; }
-        public string Department { get; set; }
+        public int DepartmentId { get; set; }
+        public string Department { get; set; }      // name, filled from the QMS database
         public string Description { get; set; }
         public string PermitIssueBy { get; set; }
         public string PermitIssueTo { get; set; }

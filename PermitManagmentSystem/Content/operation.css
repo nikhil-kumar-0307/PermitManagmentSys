@@ -453,7 +453,7 @@ td.act {
 	margin-bottom: 6px;
 }
 
-.f input[type=text], .f input[type=date], .f textarea {
+.f input[type=text], .f input[type=date], .f select, .f textarea {
 	width: 100%;
 	padding: 0 14px;
 	font: inherit;
@@ -465,7 +465,7 @@ td.act {
 	outline: none;
 }
 
-.f input[type=text], .f input[type=date] {
+.f input[type=text], .f input[type=date], .f select {
 	height: 46px;
 }
 
@@ -475,7 +475,7 @@ td.act {
 	resize: vertical;
 }
 
-	.f input:focus, .f textarea:focus {
+	.f input:focus, .f select:focus, .f textarea:focus {
 		background: #fff;
 		border-color: var(--accent);
 		box-shadow: 0 0 0 3px rgba(37,99,235,.2);

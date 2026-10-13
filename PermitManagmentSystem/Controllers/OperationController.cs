@@ -11,6 +11,7 @@ namespace PermitManagmentSystem.Controllers
     public class OperationController : Controller
     {
         private readonly ApplicationDbContext _db = new ApplicationDbContext();
+        private readonly QmsDbContext _qms = new QmsDbContext();   // departments live in the QMS database
 
         public ActionResult Index()
         {
@@ -23,6 +24,8 @@ namespace PermitManagmentSystem.Controllers
             var today = DateTime.Today;
             var tomorrow = today.AddDays(1);
             var monthStart = new DateTime(today.Year, today.Month, 1);
+
+            var names = _qms.GetDepartmentNames();
 
             var model = new OperationDashboardDto
             {
@@ -39,26 +42,31 @@ namespace PermitManagmentSystem.Controllers
                         Id = p.Id,
                         PermitNo = p.PermitNo,
                         WorkLocation = p.WorkLocation,
-                        Department = p.Department,
+                        DepartmentId = p.DepartmentId,
                         PermitIssueTo = p.PermitIssueTo,
                         IssueDate = p.IssueDate,
                         HasAttachment = p.AttachmentStoredName != null
                     }).ToList(),
 
                 ByDepartment = _db.Permits
-                    .GroupBy(p => p.Department)
-                    .Select(g => new DepartmentCountDto { Name = g.Key, Count = g.Count() })
+                    .GroupBy(p => p.DepartmentId)
+                    .Select(g => new { Id = g.Key, Count = g.Count() })
                     .OrderByDescending(x => x.Count)
                     .Take(5)
                     .ToList()
+                    .Select(x => new DepartmentCountDto { Name = QmsDbContext.NameOf(names, x.Id), Count = x.Count })
+                    .ToList()
             };
+
+            foreach (var r in model.Recent)
+                r.Department = QmsDbContext.NameOf(names, r.DepartmentId);
 
             return View(model);
         }
 
         protected override void Dispose(bool disposing)
         {
-            if (disposing) _db.Dispose();
+            if (disposing) { _db.Dispose(); _qms.Dispose(); }
             base.Dispose(disposing);
         }
     }
