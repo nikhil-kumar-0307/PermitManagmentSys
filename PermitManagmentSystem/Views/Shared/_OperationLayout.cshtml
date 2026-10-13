@@ -1,7 +1,9 @@
 ﻿@{
     var controller = (string)ViewContext.RouteData.Values["controller"];
     var action = (string)ViewContext.RouteData.Values["action"];
-    Func<string, bool> isPermitsPage = a => controller == "Permits" && a == action;
+    var onDashboard = controller == "Operation";
+    var onList = controller == "Permits" && action == "Index";
+    var onForm = controller == "Permits" && (action == "Create" || action == "Edit");
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -15,35 +17,68 @@
     <link href="~/Content/operation.css" rel="stylesheet" />
 </head>
 <body>
-    <div class="shell">
-        <aside class="side">
-            <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Permit Management</div>
+    <header class="topbar">
+        <div class="topbar-in">
+            <a class="brand" href="@Url.Action("Dashboard", "Operation")">
+                <span class="brand-mark" aria-hidden="true"></span>Permit Management
+            </a>
 
-            <nav class="nav" aria-label="Operation">
-                <a href="@Url.Action("Dashboard", "Operation")" class="@(controller == "Operation" ? "active" : "")">Dashboard</a>
-                <a href="@Url.Action("Index", "Permits")" class="@(controller == "Permits" && (action == "Index" || action == "Edit") ? "active" : "")">All permits</a>
-                <a href="@Url.Action("Create", "Permits")" class="@(isPermitsPage("Create") ? "active" : "")">Add permit</a>
+            <nav class="nav" aria-label="Main">
+                <a href="@Url.Action("Dashboard", "Operation")" class="@(onDashboard ? "on" : "")">Dashboard</a>
+                <a href="@Url.Action("Index", "Permits")" class="@(onList ? "on" : "")">All permits</a>
+                <a href="@Url.Action("Create", "Permits")" class="@(onForm ? "on" : "")">Add permit</a>
             </nav>
 
             <div class="who">
-                <strong>@User.Identity.Name</strong>
-                <span>Operation</span>
+                <span class="who-name">@User.Identity.Name</span>
+                <span class="who-role">Operation</span>
                 @using (Html.BeginForm("Logout", "Account", FormMethod.Post))
                 {
                     @Html.AntiForgeryToken()
                     <button type="submit" class="link-btn">Sign out</button>
                 }
             </div>
-        </aside>
+        </div>
+    </header>
 
-        <main class="main">
-            @if (TempData["Success"] != null)
-            {
-                <div class="flash" role="status">@TempData["Success"]</div>
+    <main class="main">
+        @if (TempData["Success"] != null)
+        {
+            <div class="flash" role="status">@TempData["Success"]</div>
+        }
+
+        @RenderBody()
+    </main>
+
+    <script>
+        // Attachment drop zone on the Add / Edit permit pages
+        (function () {
+            var drop = document.getElementById("drop");
+            if (!drop) return;
+            var input = document.getElementById("Attachment");
+            var title = document.getElementById("dropTitle");
+            var sub = document.getElementById("dropSub");
+            var t0 = title.textContent, s0 = sub.textContent;
+
+            function show() {
+                if (input.files && input.files.length) {
+                    var f = input.files[0];
+                    title.textContent = f.name;
+                    sub.textContent = (f.size / 1024 / 1024).toFixed(2) + " MB. Click to choose a different file.";
+                } else {
+                    title.textContent = t0;
+                    sub.textContent = s0;
+                }
             }
-            @RenderBody()
-        </main>
-    </div>
+            input.addEventListener("change", show);
+            ["dragenter", "dragover"].forEach(function (e) {
+                drop.addEventListener(e, function () { drop.classList.add("over"); });
+            });
+            ["dragleave", "drop"].forEach(function (e) {
+                drop.addEventListener(e, function () { drop.classList.remove("over"); });
+            });
+        })();
+    </script>
     @RenderSection("scripts", required: false)
 </body>
 </html>

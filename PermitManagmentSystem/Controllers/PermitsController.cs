@@ -22,10 +22,16 @@ namespace PermitManagmentSystem.Controllers
             { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".jpg", ".jpeg", ".png" };
         private const int MaxFileBytes = 5 * 1024 * 1024; // 5 MB
 
+        // permits per page choices in the list (must match the drop-down in Index.cshtml)
+        private static readonly int[] PageSizes = { 10, 15, 25, 50, 100 };
+        private const int DefaultPageSize = 15;
+
         // ---------------------------------------------------------------- list
-        // GET: /Permits?q=...
-        public ActionResult Index(string q)
+        // GET: /Permits?q=...&page=2&size=25
+        public ActionResult Index(string q, int page = 1, int size = DefaultPageSize)
         {
+            if (!PageSizes.Contains(size)) size = DefaultPageSize;
+
             var query = _db.Permits.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(q))
@@ -46,8 +52,15 @@ namespace PermitManagmentSystem.Controllers
                     p.PermitIssueTo.Contains(q));
             }
 
+            var total = query.Count();
+            var totalPages = Math.Max(1, (int)Math.Ceiling(total / (double)size));
+            if (page < 1) page = 1;
+            if (page > totalPages) page = totalPages;
+
             var list = query
                 .OrderByDescending(p => p.IssueDate).ThenByDescending(p => p.Id)
+                .Skip((page - 1) * size)
+                .Take(size)
                 .Select(p => new PermitListDto
                 {
                     Id = p.Id,
@@ -66,8 +79,14 @@ namespace PermitManagmentSystem.Controllers
             foreach (var row in list)
                 row.Department = QmsDbContext.NameOf(names, row.DepartmentId);
 
-            ViewBag.Query = q;
-            return View(list);
+            return View(new PermitListPageDto
+            {
+                Items = list,
+                Query = q,
+                Page = page,
+                PageSize = size,
+                TotalCount = total
+            });
         }
 
         // ---------------------------------------------------------------- add

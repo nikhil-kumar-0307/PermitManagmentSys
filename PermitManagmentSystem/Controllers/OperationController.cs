@@ -61,6 +61,19 @@ namespace PermitManagmentSystem.Controllers
             foreach (var r in model.Recent)
                 r.Department = QmsDbContext.NameOf(names, r.DepartmentId);
 
+            // Permits per day, last 30 days (days with no permits are included as 0)
+            var from = today.AddDays(-29);
+            var perDay = _db.Permits
+                .Where(p => p.IssueDate >= from && p.IssueDate < tomorrow)
+                .GroupBy(p => p.IssueDate)
+                .Select(g => new { Date = g.Key, Count = g.Count() })
+                .ToList();
+
+            model.LastDays = Enumerable.Range(0, 30)
+                .Select(i => from.AddDays(i))
+                .Select(d => new DayCountDto { Date = d, Count = perDay.Where(x => x.Date == d).Sum(x => x.Count) })
+                .ToList();
+
             return View(model);
         }
 

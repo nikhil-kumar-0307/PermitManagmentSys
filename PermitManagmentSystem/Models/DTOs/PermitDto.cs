@@ -70,4 +70,18 @@ namespace PermitManagmentSystem.Models.DTOs
         public bool HasAttachment { get; set; }
         public string AttachmentFileName { get; set; }
     }
+
+    // One page of the permit list
+    public class PermitListPageDto
+    {
+        public List<PermitListDto> Items { get; set; } = new List<PermitListDto>();
+        public string Query { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalCount { get; set; }
+
+        public int TotalPages { get { return (int)Math.Ceiling(TotalCount / (double)PageSize); } }
+        public int From { get { return TotalCount == 0 ? 0 : (Page - 1) * PageSize + 1; } }
+        public int To { get { return Math.Min(Page * PageSize, TotalCount); } }
+    }
 }

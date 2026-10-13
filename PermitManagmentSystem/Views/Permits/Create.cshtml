@@ -4,6 +4,8 @@
     ViewBag.Title = "Add permit";
 }
 
+<a class="back" href="@Url.Action("Index", "Permits")">Back to all permits</a>
+
 <div class="page-head">
     <div>
         <h1>Add permit</h1>
@@ -11,15 +13,28 @@
     </div>
 </div>
 
-<div class="form-card">
-    @using (Html.BeginForm("Create", "Permits", FormMethod.Post, new { enctype = "multipart/form-data", novalidate = "novalidate" }))
-    {
-        @Html.AntiForgeryToken()
-        @Html.Partial("_PermitFields", Model)
+@using (Html.BeginForm("Create", "Permits", FormMethod.Post, new { enctype = "multipart/form-data", novalidate = "novalidate" }))
+{
+    @Html.AntiForgeryToken()
 
-        <div class="form-actions">
-            <button type="submit" class="btn">Save permit</button>
-            <a class="btn btn-ghost" href="@Url.Action("Index", "Permits")">Cancel</a>
+    <div class="form-shell">
+        <aside class="form-aside">
+            <h2>New permit</h2>
+            <p>Fill in the three sections. Only the signed document is optional, and you can add it later from All permits.</p>
+            <ul>
+                <li>Permit no must be unique.</li>
+                <li>Pick the department that owns the work.</li>
+                <li>Attachments can be PDF, Word, Excel, JPG or PNG, up to 5 MB.</li>
+            </ul>
+        </aside>
+
+        <div class="form-main">
+            @Html.Partial("_PermitFields", Model)
+
+            <div class="form-actions">
+                <a class="btn btn-ghost" href="@Url.Action("Index", "Permits")">Cancel</a>
+                <button type="submit" class="btn">Save permit</button>
+            </div>
         </div>
-    }
-</div>
+    </div>
+}

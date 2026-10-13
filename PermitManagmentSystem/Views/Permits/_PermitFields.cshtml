@@ -5,66 +5,88 @@
     <div class="alert" role="alert">Some details need fixing. Check the highlighted fields.</div>
 }
 
-<div class="fields">
+<section class="fsec">
+    <h3>Permit details</h3>
+    <p class="fsub">The permit number, when it was issued and where the work happens.</p>
+
+    <div class="fields">
+        <div class="f">
+            @Html.LabelFor(m => m.PermitNo)
+            @Html.TextBoxFor(m => m.PermitNo, new { maxlength = 50, autofocus = "autofocus" })
+            @Html.ValidationMessageFor(m => m.PermitNo)
+        </div>
+
+        <div class="f">
+            @Html.LabelFor(m => m.IssueDate)
+            @Html.TextBoxFor(m => m.IssueDate, "{0:yyyy-MM-dd}", new { type = "date" })
+            @Html.ValidationMessageFor(m => m.IssueDate)
+        </div>
+
+        <div class="f">
+            @Html.LabelFor(m => m.WorkLocation)
+            @Html.TextBoxFor(m => m.WorkLocation, new { maxlength = 200 })
+            @Html.ValidationMessageFor(m => m.WorkLocation)
+        </div>
+
+        <div class="f">
+            @Html.LabelFor(m => m.DepartmentId)
+            @Html.DropDownListFor(m => m.DepartmentId, Model.Departments, "Select department")
+            @Html.ValidationMessageFor(m => m.DepartmentId)
+        </div>
+
+        <div class="f full">
+            @Html.LabelFor(m => m.Description)
+            @Html.TextAreaFor(m => m.Description, new { maxlength = 1000, placeholder = "What work is covered by this permit?" })
+            @Html.ValidationMessageFor(m => m.Description)
+        </div>
+    </div>
+</section>
+
+<section class="fsec">
+    <h3>People</h3>
+    <p class="fsub">Who authorised the permit and who will carry out the work.</p>
+
+    <div class="fields">
+        <div class="f">
+            @Html.LabelFor(m => m.PermitIssueBy)
+            @Html.TextBoxFor(m => m.PermitIssueBy, new { maxlength = 150 })
+            @Html.ValidationMessageFor(m => m.PermitIssueBy)
+        </div>
+
+        <div class="f">
+            @Html.LabelFor(m => m.PermitIssueTo)
+            @Html.TextBoxFor(m => m.PermitIssueTo, new { maxlength = 150 })
+            @Html.ValidationMessageFor(m => m.PermitIssueTo)
+        </div>
+    </div>
+</section>
+
+<section class="fsec">
+    <h3>Signed document</h3>
+    <p class="fsub">Attach the scanned or signed copy of the permit.</p>
+
+    @if (!string.IsNullOrEmpty(Model.ExistingFileName))
+    {
+        <div class="current-file">
+            <span>
+                Current file:
+                <a href="@Url.Action("Download", "Permits", new { id = Model.Id })">@Model.ExistingFileName</a>
+            </span>
+            <label>@Html.CheckBoxFor(m => m.RemoveAttachment) Remove this file</label>
+        </div>
+    }
+
     <div class="f">
-        @Html.LabelFor(m => m.PermitNo)
-        @Html.TextBoxFor(m => m.PermitNo, new { maxlength = 50, autofocus = "autofocus" })
-        @Html.ValidationMessageFor(m => m.PermitNo)
-    </div>
-
-    <div class="f">
-        @Html.LabelFor(m => m.IssueDate)
-        @Html.TextBoxFor(m => m.IssueDate, "{0:yyyy-MM-dd}", new { type = "date" })
-        @Html.ValidationMessageFor(m => m.IssueDate)
-    </div>
-
-    <div class="f">
-        @Html.LabelFor(m => m.WorkLocation)
-        @Html.TextBoxFor(m => m.WorkLocation, new { maxlength = 200 })
-        @Html.ValidationMessageFor(m => m.WorkLocation)
-    </div>
-
-    <div class="f">
-        @Html.LabelFor(m => m.DepartmentId)
-        @Html.DropDownListFor(m => m.DepartmentId, Model.Departments, "Select department")
-        @Html.ValidationMessageFor(m => m.DepartmentId)
-    </div>
-
-    <div class="f">
-        @Html.LabelFor(m => m.PermitIssueBy)
-        @Html.TextBoxFor(m => m.PermitIssueBy, new { maxlength = 150 })
-        @Html.ValidationMessageFor(m => m.PermitIssueBy)
-    </div>
-
-    <div class="f">
-        @Html.LabelFor(m => m.PermitIssueTo)
-        @Html.TextBoxFor(m => m.PermitIssueTo, new { maxlength = 150 })
-        @Html.ValidationMessageFor(m => m.PermitIssueTo)
-    </div>
-
-    <div class="f full">
-        @Html.LabelFor(m => m.Description)
-        @Html.TextAreaFor(m => m.Description, new { maxlength = 1000 })
-        @Html.ValidationMessageFor(m => m.Description)
-    </div>
-
-    <div class="f full">
-        <label for="Attachment">Attachment</label>
-
-        @if (!string.IsNullOrEmpty(Model.ExistingFileName))
-        {
-            <div class="current-file">
-                <span>
-                    Current file:
-                    <a href="@Url.Action("Download", "Permits", new { id = Model.Id })">@Model.ExistingFileName</a>
-                </span>
-                <label>@Html.CheckBoxFor(m => m.RemoveAttachment) Remove this file</label>
+        <div class="drop" id="drop">
+            <span class="drop-ic" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
+            </span>
+            <div>
+                <div class="drop-t" id="dropTitle">@(string.IsNullOrEmpty(Model.ExistingFileName) ? "Choose a file or drop it here" : "Choose a new file to replace the current one")</div>
+                <div class="drop-s" id="dropSub">PDF, Word, Excel, JPG or PNG. Up to 5 MB.</div>
             </div>
-            <div class="hint">Choose a new file below to replace it.</div>
-        }
-
-        <input type="file" id="Attachment" name="Attachment" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" />
-        <div class="hint">PDF, Word, Excel, JPG or PNG. Up to 5 MB.</div>
+            <input type="file" id="Attachment" name="Attachment" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png" aria-label="Attachment" />
+        </div>
         @Html.ValidationMessageFor(m => m.Attachment)
     </div>
-</div>
+</section>

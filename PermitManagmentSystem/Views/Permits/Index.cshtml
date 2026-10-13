@@ -1,28 +1,56 @@
-﻿@model List<PermitManagmentSystem.Models.DTOs.PermitListDto>
+﻿@using System.Collections.Generic
+@model PermitManagmentSystem.Models.DTOs.PermitListPageDto
 @{
     Layout = "~/Views/Shared/_OperationLayout.cshtml";
     ViewBag.Title = "All permits";
-    var query = (string)ViewBag.Query;
+    var query = Model.Query;
+    var size = Model.PageSize;
+    var sizes = new[] { 10, 15, 25, 50, 100 };
+
+    // page numbers to show: first, last and 2 either side of the current page
+    var pages = new List<int>();
+    for (var i = 1; i <= Model.TotalPages; i++)
+    {
+        if (i == 1 || i == Model.TotalPages || Math.Abs(i - Model.Page) <= 2) { pages.Add(i); }
+    }
 }
 
 <div class="page-head">
     <div>
         <h1>All permits</h1>
-        <p>@Model.Count @(Model.Count == 1 ? "permit" : "permits")@(string.IsNullOrEmpty(query) ? "" : " matching \"" + query + "\"")</p>
+        <p>@Model.TotalCount @(Model.TotalCount == 1 ? "permit" : "permits")@(string.IsNullOrEmpty(query) ? "" : " matching \"" + query + "\"")</p>
     </div>
-    <a class="btn" href="@Url.Action("Create", "Permits")">Add permit</a>
+    <a class="btn" href="@Url.Action("Create", "Permits")">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        Add permit
+    </a>
 </div>
 
-<form method="get" action="@Url.Action("Index", "Permits")" class="toolbar" role="search">
-    <input type="search" name="q" value="@query" placeholder="Search permit no, location, department or name" aria-label="Search permits" />
-    <button type="submit" class="btn btn-ghost">Search</button>
+<form method="get" action="@Url.Action("Index", "Permits")" class="toolbar" role="search" id="listForm">
+    <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <input type="search" name="q" value="@query" placeholder="Search permit no, location, department or name" aria-label="Search permits" />
+    </div>
+    <button type="submit" class="btn">Search</button>
     @if (!string.IsNullOrEmpty(query))
     {
-        <a class="btn btn-ghost" href="@Url.Action("Index", "Permits")">Clear</a>
+        <a class="btn btn-ghost" href="@Url.Action("Index", "Permits", new { size = size })">Clear</a>
     }
+
+    <span class="spacer"></span>
+
+    <label class="size-pick">
+        Rows per page
+        <select name="size" id="sizePick" aria-label="Rows per page">
+            @foreach (var s in sizes)
+            {
+                <option value="@s" @(s == size ? "selected" : "")>@s</option>
+            }
+        </select>
+    </label>
 </form>
 
-@if (!Model.Any())
+@if (!Model.Items.Any())
 {
     <div class="table-wrap">
         <div class="empty">
@@ -43,49 +71,121 @@
 else
 {
     <div class="table-wrap">
-        <table>
+        <table class="table-fixed cards">
+            <colgroup>
+                <col style="width:9%" />
+                <col style="width:11%" />
+                <col style="width:13%" />
+                <col class="hide-lg" style="width:19%" />
+                <col class="hide-md" style="width:10%" />
+                <col style="width:10%" />
+                <col style="width:9%" />
+                <col style="width:9%" />
+                <col style="width:10%" />
+            </colgroup>
             <thead>
                 <tr>
                     <th>Permit no</th>
                     <th>Work location</th>
                     <th>Department</th>
-                    <th>Description</th>
-                    <th>Issued by</th>
+                    <th class="hide-lg">Description</th>
+                    <th class="hide-md">Issued by</th>
                     <th>Issued to</th>
                     <th>Date</th>
                     <th>Attachment</th>
-                    <th><span class="sr-only" style="position:absolute;left:-9999px">Actions</span></th>
+                    <th><span style="position:absolute;left:-9999px">Actions</span></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var p in Model)
+                @foreach (var p in Model.Items)
                 {
                     <tr>
-                        <td class="no">@p.PermitNo</td>
-                        <td>@p.WorkLocation</td>
-                        <td>@p.Department</td>
-                        <td class="desc" title="@p.Description">@(p.Description != null && p.Description.Length > 70 ? p.Description.Substring(0, 70) + "..." : p.Description)</td>
-                        <td>@p.PermitIssueBy</td>
-                        <td>@p.PermitIssueTo</td>
-                        <td class="date">@p.IssueDate.ToString("dd MMM yyyy")</td>
-                        <td>
+                        <td class="no" data-label="Permit no">@p.PermitNo</td>
+                        <td data-label="Work location">@p.WorkLocation</td>
+                        <td data-label="Department">@p.Department</td>
+                        <td class="desc hide-lg" data-label="Description"><div class="clamp" title="@p.Description">@p.Description</div></td>
+                        <td class="hide-md" data-label="Issued by">@p.PermitIssueBy</td>
+                        <td data-label="Issued to">@p.PermitIssueTo</td>
+                        <td class="date" data-label="Date">@p.IssueDate.ToString("dd MMM yyyy")</td>
+                        <td data-label="Attachment">
                             @if (p.HasAttachment)
                             {
-                                <a href="@Url.Action("Download", "Permits", new { id = p.Id })">@p.AttachmentFileName</a>
+                                <a class="file" href="@Url.Action("Download", "Permits", new { id = p.Id })" title="@p.AttachmentFileName">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9" /></svg>
+                                    <span>@p.AttachmentFileName</span>
+                                </a>
                             }
                             else
                             {
-                                <span class="muted">None</span>
+                                <span class="pill none">None</span>
                             }
                         </td>
                         <td class="act">
-                            <a href="@Url.Action("Edit", "Permits", new { id = p.Id })">Edit</a>
-                            <button type="button" class="link-btn danger-link" data-delete="@p.Id" data-no="@p.PermitNo">Delete</button>
+                            <a class="act-btn" href="@Url.Action("Edit", "Permits", new { id = p.Id })">Edit</a>
+                            <button type="button" class="act-btn danger" data-delete="@p.Id" data-no="@p.PermitNo">Delete</button>
                         </td>
                     </tr>
                 }
             </tbody>
         </table>
+    </div>
+
+    <div class="pager">
+        <span>Showing @Model.From to @Model.To of @Model.TotalCount</span>
+
+        @if (Model.TotalPages > 1)
+        {
+            <div class="pager-right">
+                <nav aria-label="Permit pages">
+                    @if (Model.Page > 1)
+                    {
+                        <a class="pg" href="@Url.Action("Index", "Permits", new { q = query, size = size, page = 1 })" title="First page" aria-label="First page">&laquo;</a>
+                        <a class="pg" href="@Url.Action("Index", "Permits", new { q = query, size = size, page = Model.Page - 1 })">Previous</a>
+                    }
+                    else
+                    {
+                        <span class="pg off">&laquo;</span>
+                        <span class="pg off">Previous</span>
+                    }
+
+                    @for (var k = 0; k < pages.Count; k++)
+                    {
+                        if (k > 0 && pages[k] - pages[k - 1] > 1)
+                        {
+                            <span class="pg gap">...</span>
+                        }
+
+                        if (pages[k] == Model.Page)
+                        {
+                            <span class="pg cur" aria-current="page">@pages[k]</span>
+                        }
+                        else
+                        {
+                            <a class="pg" href="@Url.Action("Index", "Permits", new { q = query, size = size, page = pages[k] })">@pages[k]</a>
+                        }
+                    }
+
+                    @if (Model.Page < Model.TotalPages)
+                    {
+                        <a class="pg" href="@Url.Action("Index", "Permits", new { q = query, size = size, page = Model.Page + 1 })">Next</a>
+                        <a class="pg" href="@Url.Action("Index", "Permits", new { q = query, size = size, page = Model.TotalPages })" title="Last page" aria-label="Last page">&raquo;</a>
+                    }
+                    else
+                    {
+                        <span class="pg off">Next</span>
+                        <span class="pg off">&raquo;</span>
+                    }
+                </nav>
+
+                <form method="get" action="@Url.Action("Index", "Permits")" class="jump">
+                    <input type="hidden" name="q" value="@query" />
+                    <input type="hidden" name="size" value="@size" />
+                    <label for="jumpPage">Go to page</label>
+                    <input type="number" id="jumpPage" name="page" min="1" max="@Model.TotalPages" value="@Model.Page" />
+                    <button type="submit" class="btn btn-ghost">Go</button>
+                </form>
+            </div>
+        }
     </div>
 }
 
@@ -115,6 +215,11 @@ else
                 });
             });
             document.getElementById("deleteCancel").addEventListener("click", function () { dlg.close(); });
+
+            // changing rows per page reloads the list from page 1
+            document.getElementById("sizePick").addEventListener("change", function () {
+                document.getElementById("listForm").submit();
+            });
         })();
     </script>
 }

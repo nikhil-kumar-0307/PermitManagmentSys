@@ -1,79 +1,181 @@
-﻿@model PermitManagmentSystem.Models.DTOs.OperationDashboardDto
+﻿@using System.Globalization
+@model PermitManagmentSystem.Models.DTOs.OperationDashboardDto
 @{
     Layout = "~/Views/Shared/_OperationLayout.cshtml";
     ViewBag.Title = "Dashboard";
-    var max = Model.ByDepartment.Any() ? Model.ByDepartment.Max(d => d.Count) : 1;
+
+    // ---- 30-day chart: scale to the busiest day, with round axis numbers ----
+    var days = Model.LastDays;
+    var maxDay = days.Any() ? days.Max(d => d.Count) : 0;
+    var steps = new[] { 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000 };
+    var step = steps.FirstOrDefault(x => x * 4 >= maxDay);
+    if (step == 0) { step = (int)Math.Ceiling(maxDay / 4.0); }
+    var top = step * 4;
+    var total30 = days.Sum(d => d.Count);
+    var busiest = maxDay > 0 ? days.OrderByDescending(d => d.Count).ThenByDescending(d => d.Date).First() : null;
+    var chartSummary = total30 + (total30 == 1 ? " permit" : " permits") + " in total"
+        + (busiest != null ? ". Busiest day: " + busiest.Date.ToString("d MMM") + " with " + busiest.Count + "." : ".");
+
+    // ---- department ranking ----
+    var deptMax = Model.ByDepartment.Any() ? Model.ByDepartment.Max(d => d.Count) : 1;
 }
 
-<div class="page-head">
+<div class="page-head center">
     <div>
         <h1>Operation dashboard</h1>
-        <p>@DateTime.Today.ToString("dddd, dd MMMM yyyy")</p>
+        <p>@DateTime.Today.ToString("dddd, d MMMM yyyy")</p>
     </div>
-    <a class="btn" href="@Url.Action("Create", "Permits")">Add permit</a>
+    <a class="btn" href="@Url.Action("Create", "Permits")">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+        Add permit
+    </a>
 </div>
 
-<section class="stats" aria-label="Permit summary">
-    <div class="stat"><div class="n">@Model.TotalPermits</div><div class="l">Total permits</div></div>
-    <div class="stat"><div class="n">@Model.IssuedToday</div><div class="l">Issued today</div></div>
-    <div class="stat"><div class="n">@Model.IssuedThisMonth</div><div class="l">Issued this month</div></div>
-    <div class="stat @(Model.WithoutAttachment > 0 ? "warn" : "")"><div class="n">@Model.WithoutAttachment</div><div class="l">Without attachment</div></div>
+<section class="kpis" aria-label="Permit summary">
+    <div class="kpi">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg></div>
+        <div><div class="l">Total permits</div><div class="n">@Model.TotalPermits</div><div class="h">All time</div></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 11h18" /></svg></div>
+        <div><div class="l">Issued today</div><div class="n">@Model.IssuedToday</div><div class="h">@DateTime.Today.ToString("d MMM yyyy")</div></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg></div>
+        <div><div class="l">Issued this month</div><div class="n">@Model.IssuedThisMonth</div><div class="h">@DateTime.Today.ToString("MMMM yyyy")</div></div>
+    </div>
+    <div class="kpi @(Model.WithoutAttachment > 0 ? "warn" : "ok")">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9" /></svg></div>
+        <div>
+            <div class="l">Without attachment</div>
+            <div class="n">@Model.WithoutAttachment</div>
+            <div class="h">@(Model.WithoutAttachment > 0 ? "Open All permits to add the document" : "Every permit has a document")</div>
+        </div>
+    </div>
 </section>
 
-<div class="grid-2">
+<div class="row-2">
     <section class="panel">
         <div class="panel-head">
-            <h2>Latest permits</h2>
-            <a href="@Url.Action("Index", "Permits")">View all permits</a>
+            <h2>Permits issued, last 30 days</h2>
+            <span class="sub">@chartSummary</span>
         </div>
 
-        @if (!Model.Recent.Any())
-        {
-            <div class="empty">
-                <h2>No permits yet</h2>
-                <p>Permits you add will show up here.</p>
-                <a class="btn" href="@Url.Action("Create", "Permits")">Add the first permit</a>
+        <div class="chart" role="img" aria-label="Bar chart of permits issued per day over the last 30 days, @total30 in total">
+            <div class="yaxis" aria-hidden="true">
+                @for (var k = 0; k <= 4; k++)
+                {
+                    <span style="bottom:@(k * 25)%">@(step * k)</span>
+                }
             </div>
-        }
-        else
-        {
-            <div class="table-wrap" style="border:0;border-radius:0">
-                <table>
-                    <thead><tr><th>Permit no</th><th>Work location</th><th>Department</th><th>Issued to</th><th>Date</th></tr></thead>
-                    <tbody>
-                        @foreach (var p in Model.Recent)
-                        {
-                            <tr>
-                                <td class="no"><a href="@Url.Action("Edit", "Permits", new { id = p.Id })">@p.PermitNo</a></td>
-                                <td>@p.WorkLocation</td>
-                                <td>@p.Department</td>
-                                <td>@p.PermitIssueTo</td>
-                                <td class="date">@p.IssueDate.ToString("dd MMM yyyy")</td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
+
+            <div class="plot">
+                @for (var k = 1; k <= 4; k++)
+                {
+                    <div class="gl" style="bottom:@(k * 25)%"></div>
+                }
+
+                <div class="cols">
+                    @foreach (var d in days)
+                    {
+                        var pct = (d.Count * 100.0 / top).ToString("0.##", CultureInfo.InvariantCulture);
+                        var isToday = d.Date.Date == DateTime.Today;
+                        <div class="col @(isToday ? "today" : "") @(d.Count == 0 ? "zero" : "")"
+                             title="@(d.Date.ToString("d MMM") + ": " + d.Count + (d.Count == 1 ? " permit" : " permits"))">
+                            <div class="bar" style="height:@(pct)%"></div>
+                        </div>
+                    }
+                </div>
             </div>
-        }
+
+            <div class="xlabels" aria-hidden="true">
+                @for (var i = 0; i < days.Count; i++)
+                {
+                    var show = (i % 5 == 0) || i == days.Count - 1;
+                    <span class="@(days[i].Date.Date == DateTime.Today ? "today" : "")">@(show ? days[i].Date.Day.ToString() : "")</span>
+                }
+            </div>
+        </div>
     </section>
 
     <section class="panel">
-        <div class="panel-head"><h2>Permits by department</h2></div>
+        <div class="panel-head"><h2>Permits by department</h2><span class="sub">Top 5</span></div>
+
         @if (!Model.ByDepartment.Any())
         {
             <div class="empty">Nothing to show yet.</div>
         }
         else
         {
-            <ul class="bars">
+            <ul class="rank">
                 @foreach (var d in Model.ByDepartment)
                 {
+                    var share = Model.TotalPermits > 0 ? (int)Math.Round(d.Count * 100.0 / Model.TotalPermits) : 0;
                     <li>
-                        <div class="top"><span>@d.Name</span><strong>@d.Count</strong></div>
-                        <div class="track"><div class="fill" style="width:@(d.Count * 100 / max)%"></div></div>
+                        <div class="top">
+                            <span class="nm">@d.Name</span>
+                            <span class="ct">@d.Count<small>@(share)%</small></span>
+                        </div>
+                        <div class="track"><div class="fill" style="width:@(d.Count * 100 / deptMax)%"></div></div>
                     </li>
                 }
             </ul>
         }
     </section>
 </div>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Latest permits</h2>
+        <a href="@Url.Action("Index", "Permits")">View all permits</a>
+    </div>
+
+    @if (!Model.Recent.Any())
+    {
+        <div class="empty">
+            <h2>No permits yet</h2>
+            <p>Permits you add will show up here.</p>
+            <a class="btn" href="@Url.Action("Create", "Permits")">Add the first permit</a>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-fixed cards">
+                <colgroup>
+                    <col style="width:13%" />
+                    <col style="width:20%" />
+                    <col style="width:23%" />
+                    <col style="width:20%" />
+                    <col style="width:12%" />
+                    <col style="width:12%" />
+                </colgroup>
+                <thead>
+                    <tr><th>Permit no</th><th>Work location</th><th>Department</th><th>Issued to</th><th>Date</th><th>Attachment</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.Recent)
+                    {
+                        <tr>
+                            <td class="no" data-label="Permit no"><a href="@Url.Action("Edit", "Permits", new { id = p.Id })">@p.PermitNo</a></td>
+                            <td data-label="Work location">@p.WorkLocation</td>
+                            <td data-label="Department">@p.Department</td>
+                            <td data-label="Issued to">@p.PermitIssueTo</td>
+                            <td class="date" data-label="Date">@p.IssueDate.ToString("dd MMM yyyy")</td>
+                            <td data-label="Attachment">
+                                @if (p.HasAttachment)
+                                {
+                                    <span class="pill ok">Attached</span>
+                                }
+                                else
+                                {
+                                    <span class="pill none">Missing</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
