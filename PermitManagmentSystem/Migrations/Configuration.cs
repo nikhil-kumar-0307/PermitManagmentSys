@@ -40,10 +40,11 @@
                 },
                 new User
                 {
-                    Username = "DEPT001",
+                    Username = "IT",
                     FullName = "Department User",
                     Password = "Dept@123",
                     Role = AppRoles.Department,
+                    DepartmentName = "IT",   // must match the department name in QMS
                     IsActive = true,
                     CreatedOn = DateTime.Now
                 },
