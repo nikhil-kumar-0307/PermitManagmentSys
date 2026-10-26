@@ -1,0 +1,88 @@
+﻿@model PermitManagmentSystem.Models.DTOs.DepartmentPermitListDto
+@{
+    Layout = "~/Views/Shared/_DepartmentLayout.cshtml";
+    ViewBag.Title = "Permits";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Permits</h1>
+        <p>Permits issued by Operation to your department.</p>
+    </div>
+</div>
+
+<form class="toolbar" method="get" action="@Url.Action("Permits", "Department")">
+    <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <input type="search" name="q" value="@Model.Query" placeholder="Search permit no, location, description or name" aria-label="Search permits" />
+    </div>
+    <div class="size-pick">
+        <label for="status">Status</label>
+        <select id="status" name="status" onchange="this.form.submit()">
+            <option value="" selected="@(string.IsNullOrEmpty(Model.Status))">All</option>
+            <option value="pending" selected="@(Model.Status == "pending")">Awaiting assignment</option>
+            <option value="assigned" selected="@(Model.Status == "assigned")">Assigned</option>
+        </select>
+    </div>
+    <button class="btn" type="submit">Search</button>
+</form>
+
+@if (!Model.Items.Any())
+{
+    <div class="table-wrap">
+        <div class="empty">
+            <h2>No permits found</h2>
+            <p>Try a different search or status.</p>
+        </div>
+    </div>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="table-fixed cards">
+            <colgroup>
+                <col style="width:12%" />
+                <col style="width:19%" />
+                <col style="width:15%" />
+                <col style="width:11%" />
+                <col style="width:12%" />
+                <col style="width:14%" />
+                <col style="width:17%" />
+            </colgroup>
+            <thead>
+                <tr><th>Permit no</th><th>Work location</th><th>Issued by</th><th>Date</th><th>Status</th><th>Expected end</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model.Items)
+                {
+                    <tr>
+                        <td class="no" data-label="Permit no"><a href="@Url.Action("Assign", "Department", new { id = p.Id })">@p.PermitNo</a></td>
+                        <td data-label="Work location">@p.WorkLocation</td>
+                        <td data-label="Issued by">@p.PermitIssueBy</td>
+                        <td class="date" data-label="Date">@p.IssueDate.ToString("dd MMM yyyy")</td>
+                        <td data-label="Status">
+                            @if (p.HasTask)
+                            {<span class="pill ok">Assigned</span> }
+                            else
+                            { <span class="pill none">Awaiting</span>}
+                        </td>
+                        <td class="date" data-label="Expected end">
+                            @if (p.ExpectedEndDate.HasValue)
+                            {
+                                @p.ExpectedEndDate.Value.ToString("dd MMM yyyy")
+                            }
+                            else
+                            {
+                                <span class="muted">&mdash;</span>
+                            }
+                        </td>
+                        <td class="act">
+                            <a class="act-btn" href="@Url.Action("Assign", "Department", new { id = p.Id })">@(p.HasTask ? "View / edit" : "Assign work")</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="hint">Showing the latest @Model.Items.Count permits. Use search to narrow the list.</p>
+}

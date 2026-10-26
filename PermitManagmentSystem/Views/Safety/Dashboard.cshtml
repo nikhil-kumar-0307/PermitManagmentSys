@@ -1,0 +1,156 @@
+﻿@using System.Globalization
+@model PermitManagmentSystem.Models.DTOs.SafetyDashboardDto
+@{
+    Layout = "~/Views/Shared/_SafetyLayout.cshtml";
+    ViewBag.Title = "Dashboard";
+
+    var days = Model.LastDays;
+    var maxDay = days.Any() ? days.Max(d => d.Count) : 0;
+    var steps = new[] { 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000 };
+    var step = steps.FirstOrDefault(x => x * 4 >= maxDay);
+    if (step == 0) { step = (int)Math.Ceiling(maxDay / 4.0); }
+    var top = step * 4;
+    var total30 = days.Sum(d => d.Count);
+    var busiest = maxDay > 0 ? days.OrderByDescending(d => d.Count).ThenByDescending(d => d.Date).First() : null;
+    var chartSummary = total30 + (total30 == 1 ? " job" : " jobs") + " received"
+        + (busiest != null ? ". Busiest day: " + busiest.Date.ToString("d MMM") + " with " + busiest.Count + "." : ".");
+    var deptMax = Model.ByDepartment.Any() ? Model.ByDepartment.Max(d => d.Count) : 1;
+}
+
+<div class="page-head center">
+    <div>
+        <h1>Safety dashboard</h1>
+        <p>@DateTime.Today.ToString("dddd, d MMMM yyyy")</p>
+    </div>
+    <a class="btn" href="@Url.Action("Tasks", "Safety", new { status = "pending" })">Jobs needing a steward</a>
+</div>
+
+<section class="kpis" aria-label="Safety summary">
+    <div class="kpi">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg></div>
+        <div><div class="l">Jobs from departments</div><div class="n">@Model.TotalTasks</div><div class="h">All time</div></div>
+    </div>
+    <div class="kpi @(Model.AwaitingSteward > 0 ? "warn" : "ok")">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div>
+        <div>
+            <div class="l">Awaiting steward</div>
+            <div class="n">@Model.AwaitingSteward</div>
+            <div class="h">@(Model.AwaitingSteward > 0 ? "Add the Safety Steward" : "Every job has a steward")</div>
+        </div>
+    </div>
+    <div class="kpi ok">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /><path d="M9 12l2 2 4-4" /></svg></div>
+        <div><div class="l">Steward assigned</div><div class="n">@Model.StewardAssigned</div><div class="h">Completed by Safety</div></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" /></svg></div>
+        <div><div class="l">Workers on permits</div><div class="n">@Model.WorkersOnPermits</div><div class="h">Pass numbers entered</div></div>
+    </div>
+</section>
+
+<div class="row-2">
+    <section class="panel">
+        <div class="panel-head"><h2>Jobs received, last 30 days</h2><span class="sub">@chartSummary</span></div>
+        <div class="chart" role="img" aria-label="Bar chart of jobs received per day over the last 30 days, @total30 in total">
+            <div class="yaxis" aria-hidden="true">
+                @for (var k = 0; k <= 4; k++)
+                {<span style="bottom:@(k * 25)%">@(step * k)</span>}
+            </div>
+            <div class="plot">
+                @for (var k = 1; k <= 4; k++)
+                {<div class="gl" style="bottom:@(k * 25)%"></div>}
+                <div class="cols">
+                    @foreach (var d in days)
+                    {
+                        var pct = (d.Count * 100.0 / top).ToString("0.##", CultureInfo.InvariantCulture);
+                        var isToday = d.Date.Date == DateTime.Today;
+                        <div class="col @(isToday ? "today" : "") @(d.Count == 0 ? "zero" : "")"
+                             title="@(d.Date.ToString("d MMM") + ": " + d.Count + (d.Count == 1 ? " job" : " jobs"))">
+                            <div class="bar" style="height:@(pct)%"></div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="xlabels" aria-hidden="true">
+                @for (var i = 0; i < days.Count; i++)
+                {
+                    var show = (i % 5 == 0) || i == days.Count - 1;
+                    <span class="@(days[i].Date.Date == DateTime.Today ? "today" : "")">@(show ? days[i].Date.Day.ToString() : "")</span>
+                }
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><h2>Jobs by department</h2><span class="sub">Top 5</span></div>
+        @if (!Model.ByDepartment.Any())
+        {
+            <div class="empty">Nothing to show yet.</div>
+        }
+        else
+        {
+            <ul class="rank">
+                @foreach (var d in Model.ByDepartment)
+                {
+                    var share = Model.TotalTasks > 0 ? (int)Math.Round(d.Count * 100.0 / Model.TotalTasks) : 0;
+                    <li>
+                        <div class="top">
+                            <span class="nm">@d.Name</span>
+                            <span class="ct">@d.Count<small>@(share)%</small></span>
+                        </div>
+                        <div class="track"><div class="fill" style="width:@(d.Count * 100 / deptMax)%"></div></div>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Assign Safety Steward</h2>
+        <a href="@Url.Action("Tasks", "Safety")">View all work</a>
+    </div>
+
+    @if (!Model.LatestAwaiting.Any())
+    {
+        <div class="empty"><h2>Nothing waiting</h2><p>Work saved by any department shows up here.</p></div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-fixed cards">
+                <colgroup>
+                    <col style="width:11%" />
+                    <col style="width:14%" />
+                    <col style="width:17%" />
+                    <col style="width:15%" />
+                    <col style="width:11%" />
+                    <col style="width:32%" />
+                </colgroup>
+                <thead><tr><th>Permit no</th><th>Department</th><th>Work location</th><th>Supervisor</th><th>Expected end</th><th>Safety Steward</th></tr></thead>
+                <tbody>
+                    @foreach (var t in Model.LatestAwaiting)
+                    {
+                        <tr>
+                            <td class="no" data-label="Permit no"><a href="@Url.Action("Steward", "Safety", new { id = t.TaskId })" title="View details">@t.PermitNo</a></td>
+                            <td data-label="Department">@t.DepartmentName</td>
+                            <td data-label="Work location">@t.WorkLocation</td>
+                            <td data-label="Supervisor">@t.SupervisorName</td>
+                            <td class="date" data-label="Expected end">@t.ExpectedEndDate.ToString("dd MMM yyyy")</td>
+                            <td>
+                                <form method="post" action="@Url.Action("AssignSteward", "Safety")" class="assign-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="taskId" value="@t.TaskId" />
+                                    <input type="hidden" name="returnTo" value="dashboard" />
+                                    <input type="text" name="steward" maxlength="150" placeholder="Safety Steward" aria-label="Safety Steward for @t.PermitNo" autocomplete="off" />
+                                    <button type="submit" class="btn btn-sm">Save</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

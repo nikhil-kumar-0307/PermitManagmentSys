@@ -13,5 +13,7 @@ namespace PermitManagmentSystem.Data
 
         public DbSet<User> Users { get; set; }
         public DbSet<Permit> Permits { get; set; }
+        public DbSet<PermitTask> PermitTasks { get; set; }
+        public DbSet<PermitWorker> PermitWorkers { get; set; }
     }
 }

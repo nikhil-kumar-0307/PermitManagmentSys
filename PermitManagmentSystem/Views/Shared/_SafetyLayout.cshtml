@@ -1,0 +1,47 @@
+﻿@{
+    var action = (string)ViewContext.RouteData.Values["action"];
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>@ViewBag.Title - Permit Management</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/department.css")" rel="stylesheet" />
+</head>
+<body>
+    <header class="topbar">
+        <div class="topbar-in">
+            <a class="brand" href="@Url.Action("Dashboard", "Safety")"><span class="brand-mark"></span>Permit Management</a>
+            <nav class="nav" aria-label="Main">
+                <a class="@(action == "Dashboard" ? "on" : "")" href="@Url.Action("Dashboard", "Safety")">Dashboard</a>
+                <a class="@(action == "Tasks" || action == "Steward" ? "on" : "")" href="@Url.Action("Tasks", "Safety")">Work</a>
+            </nav>
+            <div class="who">
+                <span class="who-name">@User.Identity.Name</span>
+                <span class="who-role">Safety</span>
+                @using (Html.BeginForm("Logout", "Account", FormMethod.Post))
+                {
+                    @Html.AntiForgeryToken()
+                    <button type="submit" class="link-btn">Sign out</button>
+                }
+            </div>
+        </div>
+    </header>
+
+    <main class="main">
+        @if (TempData["Flash"] != null)
+        {
+            <div class="flash" role="status">@TempData["Flash"]</div>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert" role="alert">@TempData["Error"]</div>
+        }
+        @RenderBody()
+    </main>
+
+    @RenderSection("Scripts", required: false)
+</body>
+</html>

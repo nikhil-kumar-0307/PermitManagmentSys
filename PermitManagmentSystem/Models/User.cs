@@ -19,7 +19,7 @@ namespace PermitManagmentSystem.Models
         [Key]
         public int Id { get; set; }
 
-        [Required, StringLength(100)]        
+        [Required, StringLength(100)]
         public string Username { get; set; }
 
         [Required, StringLength(150)]
@@ -27,9 +27,14 @@ namespace PermitManagmentSystem.Models
 
         [Required, StringLength(300)]
         public string Password { get; set; }
-       
+
         [Required, StringLength(50)]
         public string Role { get; set; }
+
+        // Only for Role = "Department": the department NAME exactly as it appears in QMS
+        // (Departments.Name / EmployeeMaster.Department). The id is looked up at login. Null for other roles.
+        [StringLength(150)]
+        public string DepartmentName { get; set; }
 
         public bool IsActive { get; set; } = true;
 

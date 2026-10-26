@@ -1,0 +1,170 @@
+﻿@using System.Globalization
+@model PermitManagmentSystem.Models.DTOs.DepartmentDashboardDto
+@{
+    Layout = "~/Views/Shared/_DepartmentLayout.cshtml";
+    ViewBag.Title = "Dashboard";
+
+    // ---- 30-day chart: scale to the busiest day, with round axis numbers ----
+    var days = Model.LastDays;
+    var maxDay = days.Any() ? days.Max(d => d.Count) : 0;
+    var steps = new[] { 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000 };
+    var step = steps.FirstOrDefault(x => x * 4 >= maxDay);
+    if (step == 0) { step = (int)Math.Ceiling(maxDay / 4.0); }
+    var top = step * 4;
+    var total30 = days.Sum(d => d.Count);
+    var busiest = maxDay > 0 ? days.OrderByDescending(d => d.Count).ThenByDescending(d => d.Date).First() : null;
+    var chartSummary = total30 + (total30 == 1 ? " permit" : " permits") + " received"
+        + (busiest != null ? ". Busiest day: " + busiest.Date.ToString("d MMM") + " with " + busiest.Count + "." : ".");
+}
+
+<div class="page-head center">
+    <div>
+        <h1>@Model.DepartmentName</h1>
+        <p>Department dashboard &middot; @DateTime.Today.ToString("dddd, d MMMM yyyy")</p>
+    </div>
+    <a class="btn" href="@Url.Action("Permits", "Department", new { status = "pending" })">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        Permits to assign
+    </a>
+</div>
+
+<section class="kpis" aria-label="Department summary">
+    <div class="kpi">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg></div>
+        <div><div class="l">Permits received</div><div class="n">@Model.TotalPermits</div><div class="h">All time</div></div>
+    </div>
+    <div class="kpi @(Model.AwaitingAssignment > 0 ? "warn" : "ok")">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div>
+        <div>
+            <div class="l">Awaiting assignment</div>
+            <div class="n">@Model.AwaitingAssignment</div>
+            <div class="h">@(Model.AwaitingAssignment > 0 ? "Open the permit and assign the work" : "Everything is assigned")</div>
+        </div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 11h18" /></svg></div>
+        <div><div class="l">Work assigned</div><div class="n">@Model.Assigned</div><div class="h">@Model.EndingThisWeek ending in 7 days</div></div>
+    </div>
+    <div class="kpi">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" /></svg></div>
+        <div><div class="l">Workers on permits</div><div class="n">@Model.WorkersDeployed</div><div class="h">Pass numbers entered</div></div>
+    </div>
+</section>
+
+<div class="row-2">
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Permits received, last 30 days</h2>
+            <span class="sub">@chartSummary</span>
+        </div>
+
+        <div class="chart" role="img" aria-label="Bar chart of permits received per day over the last 30 days, @total30 in total">
+            <div class="yaxis" aria-hidden="true">
+                @for (var k = 0; k <= 4; k++)
+                {
+                    <span style="bottom:@(k * 25)%">@(step * k)</span>
+                }
+            </div>
+            <div class="plot">
+                @for (var k = 1; k <= 4; k++)
+                {
+                    <div class="gl" style="bottom:@(k * 25)%"></div>
+                }
+                <div class="cols">
+                    @foreach (var d in days)
+                    {
+                        var pct = (d.Count * 100.0 / top).ToString("0.##", CultureInfo.InvariantCulture);
+                        var isToday = d.Date.Date == DateTime.Today;
+                        <div class="col @(isToday ? "today" : "") @(d.Count == 0 ? "zero" : "")"
+                             title="@(d.Date.ToString("d MMM") + ": " + d.Count + (d.Count == 1 ? " permit" : " permits"))">
+                            <div class="bar" style="height:@(pct)%"></div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="xlabels" aria-hidden="true">
+                @for (var i = 0; i < days.Count; i++)
+                {
+                    var show = (i % 5 == 0) || i == days.Count - 1;
+                    <span class="@(days[i].Date.Date == DateTime.Today ? "today" : "")">@(show ? days[i].Date.Day.ToString() : "")</span>
+                }
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <div class="panel-head"><h2>Work ending soon</h2><span class="sub">Next 5</span></div>
+
+        @if (!Model.Upcoming.Any())
+        {
+            <div class="empty">No assigned work with an upcoming end date.</div>
+        }
+        else
+        {
+            <ul class="rank">
+                @foreach (var u in Model.Upcoming)
+                {
+                    var left = (u.ExpectedEndDate.Date - DateTime.Today).Days;
+                    <li>
+                        <div class="top">
+                            <span class="nm"><a href="@Url.Action("Assign", "Department", new { id = u.PermitId })">@u.PermitNo</a></span>
+                            <span class="ct">@u.ExpectedEndDate.ToString("d MMM")<small>@(left == 0 ? "today" : left + (left == 1 ? " day" : " days"))</small></span>
+                        </div>
+                        <div class="line">@u.WorkLocation &middot; @u.SupervisorName &middot; @u.WorkerCount @(u.WorkerCount == 1 ? "worker" : "workers")</div>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</div>
+
+<section class="panel">
+    <div class="panel-head">
+        <h2>Permits awaiting assignment</h2>
+        <a href="@Url.Action("Permits", "Department")">View all permits</a>
+    </div>
+
+    @if (!Model.LatestAwaiting.Any())
+    {
+        <div class="empty">
+            <h2>Nothing waiting</h2>
+            <p>New permits from Operation will show up here.</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-fixed cards">
+                <colgroup>
+                    <col style="width:14%" />
+                    <col style="width:24%" />
+                    <col style="width:20%" />
+                    <col style="width:14%" />
+                    <col style="width:14%" />
+                    <col style="width:14%" />
+                </colgroup>
+                <thead>
+                    <tr><th>Permit no</th><th>Work location</th><th>Issued to</th><th>Date</th><th>Document</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in Model.LatestAwaiting)
+                    {
+                        <tr>
+                            <td class="no" data-label="Permit no"><a href="@Url.Action("Assign", "Department", new { id = p.Id })">@p.PermitNo</a></td>
+                            <td data-label="Work location">@p.WorkLocation</td>
+                            <td data-label="Issued to">@p.PermitIssueTo</td>
+                            <td class="date" data-label="Date">@p.IssueDate.ToString("dd MMM yyyy")</td>
+                            <td data-label="Document">
+                                @if (p.HasAttachment)
+                                {<span class="pill ok">Attached</span> }
+                                else
+                                { <span class="pill none">Missing</span>}
+                            </td>
+                            <td class="act"><a class="act-btn" href="@Url.Action("Assign", "Department", new { id = p.Id })">Assign work</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>

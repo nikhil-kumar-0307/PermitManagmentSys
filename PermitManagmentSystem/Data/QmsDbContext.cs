@@ -34,6 +34,20 @@ namespace PermitManagmentSystem.Data
                 .ToDictionary(d => d.Id, d => d.Name);
         }
 
+        // Department name -> Id (ignores case and extra spaces). Null when there is no match.
+        public int? FindDepartmentId(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            var wanted = name.Trim();
+
+            var hit = Departments
+                .Select(d => new { d.Id, d.Name })
+                .ToList()
+                .FirstOrDefault(d => d.Name != null && string.Equals(d.Name.Trim(), wanted, StringComparison.OrdinalIgnoreCase));
+
+            return hit == null ? (int?)null : hit.Id;
+        }
+
         public static string NameOf(Dictionary<int, string> names, int departmentId)
         {
             string name;
