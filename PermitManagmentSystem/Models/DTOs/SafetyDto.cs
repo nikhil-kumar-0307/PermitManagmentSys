@@ -10,8 +10,11 @@ namespace PermitManagmentSystem.Models.DTOs
         public int AwaitingSteward { get; set; }
         public int StewardAssigned { get; set; }
         public int WorkersOnPermits { get; set; }
+        public int AwaitingFinalClose { get; set; }   // department closed, Safety must final close
+        public int FinalClosed { get; set; }
 
         public List<SafetyTaskRowDto> LatestAwaiting { get; set; } = new List<SafetyTaskRowDto>();
+        public List<SafetyTaskRowDto> FinalCloseList { get; set; } = new List<SafetyTaskRowDto>();
         public List<DepartmentCountDto> ByDepartment { get; set; } = new List<DepartmentCountDto>();
         public List<DayCountDto> LastDays { get; set; } = new List<DayCountDto>();
     }
@@ -29,14 +32,28 @@ namespace PermitManagmentSystem.Models.DTOs
         public DateTime ExpectedEndDate { get; set; }
         public int WorkerCount { get; set; }
         public string SafetyStewardName { get; set; }
+        public string SafetyStewardMobile { get; set; }
+        public DateTime? ClosedOn { get; set; }          // closed by the department
+        public DateTime? FinalClosedOn { get; set; }     // final closed by Safety
+
         public bool HasSteward { get { return !string.IsNullOrEmpty(SafetyStewardName); } }
+        public bool IsClosed { get { return ClosedOn.HasValue; } }                       // department closed
+        public bool IsFinalClosed { get { return FinalClosedOn.HasValue; } }
+        public bool CanFinalClose { get { return ClosedOn.HasValue && !FinalClosedOn.HasValue; } }
     }
 
     public class SafetyTaskListDto
     {
         public List<SafetyTaskRowDto> Items { get; set; } = new List<SafetyTaskRowDto>();
         public string Query { get; set; }
-        public string Status { get; set; }   // "", "pending", "done"
+        public string Status { get; set; }   // "", "pending", "done", "closing", "closed"
+    }
+
+    // read-only worker shown to Safety
+    public class SafetyWorkerDto
+    {
+        public string PassNo { get; set; }
+        public string WorkerName { get; set; }
     }
 
     public class SafetyStewardDto
@@ -56,13 +73,28 @@ namespace PermitManagmentSystem.Models.DTOs
         public string SupervisorName { get; set; }
         public DateTime WorkStartDate { get; set; }
         public DateTime ExpectedEndDate { get; set; }
-        public List<string> WorkerPassNos { get; set; } = new List<string>();
+        public List<SafetyWorkerDto> Workers { get; set; } = new List<SafetyWorkerDto>();
         public bool IsEdit { get; set; }
 
-        // ---- the only field Safety fills ----
+        // department has closed the job - Safety can only view it or final close it
+        public bool IsClosed { get; set; }
+        public DateTime? ClosedOn { get; set; }
+
+        // Safety has done the final close
+        public bool IsFinalClosed { get; set; }
+        public DateTime? FinalClosedOn { get; set; }
+        public bool CanFinalClose { get { return IsClosed && !IsFinalClosed; } }
+
+        // ---- the fields Safety fills ----
         [Required(ErrorMessage = "Safety steward is required")]
         [StringLength(150, ErrorMessage = "Safety steward can be up to 150 characters")]
         [Display(Name = "Safety Steward")]
         public string SafetyStewardName { get; set; }
+
+        [Required(ErrorMessage = "Mobile no is required")]
+        [StringLength(15, ErrorMessage = "Mobile no can be up to 15 characters")]
+        [RegularExpression(@"^\+?[0-9\s\-]{10,15}$", ErrorMessage = "Enter a valid mobile no (10 to 15 digits)")]
+        [Display(Name = "Mobile no")]
+        public string SafetyStewardMobile { get; set; }
     }
 }

@@ -14,7 +14,7 @@
 <form class="toolbar" method="get" action="@Url.Action("Tasks", "Safety")">
     <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-        <input type="search" name="q" value="@Model.Query" placeholder="Search permit no, location, supervisor or steward" aria-label="Search work" />
+        <input type="search" name="q" value="@Model.Query" placeholder="Search permit no, location, supervisor, steward or mobile" aria-label="Search work" />
     </div>
     <div class="size-pick">
         <label for="status">Status</label>
@@ -22,6 +22,8 @@
             <option value="" selected="@(string.IsNullOrEmpty(Model.Status))">All</option>
             <option value="pending" selected="@(Model.Status == "pending")">Awaiting steward</option>
             <option value="done" selected="@(Model.Status == "done")">Steward assigned</option>
+            <option value="closing" selected="@(Model.Status == "closing")">Awaiting final close</option>
+            <option value="closed" selected="@(Model.Status == "closed")">Final closed</option>
         </select>
     </div>
     <button class="btn" type="submit">Search</button>
@@ -36,13 +38,13 @@ else
     <div class="table-wrap">
         <table class="table-fixed cards">
             <colgroup>
+                <col style="width:9%" />
+                <col style="width:12%" />
+                <col style="width:12%" />
+                <col style="width:11%" />
                 <col style="width:10%" />
-                <col style="width:13%" />
-                <col style="width:15%" />
-                <col style="width:13%" />
-                <col style="width:10%" />
-                <col style="width:29%" />
-                <col style="width:10%" />
+                <col style="width:30%" />
+                <col style="width:16%" />
             </colgroup>
             <thead><tr><th>Permit no</th><th>Department</th><th>Work location</th><th>Supervisor</th><th>Expected end</th><th>Safety Steward</th><th></th></tr></thead>
             <tbody>
@@ -55,17 +57,47 @@ else
                         <td data-label="Supervisor">@t.SupervisorName</td>
                         <td class="date" data-label="Expected end">@t.ExpectedEndDate.ToString("dd MMM yyyy")</td>
                         <td>
-                            <form method="post" action="@Url.Action("AssignSteward", "Safety")" class="assign-form">
-                                @Html.AntiForgeryToken()
-                                <input type="hidden" name="taskId" value="@t.TaskId" />
-                                <input type="hidden" name="returnTo" value="tasks" />
-                                <input type="hidden" name="q" value="@Model.Query" />
-                                <input type="hidden" name="status" value="@Model.Status" />
-                                <input type="text" name="steward" value="@t.SafetyStewardName" maxlength="150" placeholder="Safety Steward" aria-label="Safety Steward for @t.PermitNo" autocomplete="off" />
-                                <button type="submit" class="btn btn-sm">@(t.HasSteward ? "Update" : "Save")</button>
-                            </form>
+                            @if (t.IsClosed)
+                            {
+                                <span class="closed-note">
+                                    <strong>@t.SafetyStewardName</strong>
+                                    @if (!string.IsNullOrEmpty(t.SafetyStewardMobile))
+                                    {<span class="muted">@t.SafetyStewardMobile</span>}
+                                    @if (t.IsFinalClosed)
+                                    {<span class="pill closed">Final closed</span>}
+                                    else
+                                    {<span class="pill wait">Awaiting final close</span>}
+                                </span>
+                            }
+                            else
+                            {
+                                <form method="post" action="@Url.Action("AssignSteward", "Safety")" class="assign-form">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="taskId" value="@t.TaskId" />
+                                    <input type="hidden" name="returnTo" value="tasks" />
+                                    <input type="hidden" name="q" value="@Model.Query" />
+                                    <input type="hidden" name="status" value="@Model.Status" />
+                                    <input type="text" class="a-name" name="steward" value="@t.SafetyStewardName" maxlength="150" placeholder="Safety Steward" aria-label="Safety Steward for @t.PermitNo" autocomplete="off" />
+                                    <input type="text" inputmode="tel" class="a-mobile" name="mobile" value="@t.SafetyStewardMobile" maxlength="15" placeholder="Mobile no" aria-label="Steward mobile no for @t.PermitNo" autocomplete="off" />
+                                    <button type="submit" class="btn btn-sm">@(t.HasSteward ? "Update" : "Save")</button>
+                                </form>
+                            }
                         </td>
-                        <td class="act"><a class="act-btn" href="@Url.Action("Steward", "Safety", new { id = t.TaskId })">Details</a></td>
+                        <td class="act">
+                            <a class="act-btn" href="@Url.Action("Steward", "Safety", new { id = t.TaskId })">Details</a>
+                            @if (t.CanFinalClose)
+                            {
+                                using (Html.BeginForm("FinalClose", "Safety", FormMethod.Post, new { @class = "inline-form", onsubmit = "return confirm('Final close this job? This cannot be undone.');" }))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="taskId" value="@t.TaskId" />
+                                    <input type="hidden" name="returnTo" value="tasks" />
+                                    <input type="hidden" name="q" value="@Model.Query" />
+                                    <input type="hidden" name="status" value="@Model.Status" />
+                                    <button type="submit" class="act-btn danger">Final close</button>
+                                }
+                            }
+                        </td>
                     </tr>
                 }
             </tbody>

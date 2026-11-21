@@ -908,7 +908,8 @@ td.act {
 	margin-bottom: 6px;
 }
 
-.f input[type=text], .f input[type=date], .f select, .f textarea {
+.f input[type=text], .f input[type=date], .f input[type=tel], .f select, .f textarea
+{
 	width: 100%;
 	max-width: none;
 	padding: 0 14px;
@@ -921,7 +922,7 @@ td.act {
 	transition: border-color .12s, box-shadow .12s;
 }
 
-.f input[type=text], .f input[type=date], .f select {
+.f input[type=text], .f input[type=date], .f input[type=tel], .f select {
 	height: 46px;
 }
 
@@ -1167,16 +1168,16 @@ td.act {
 /* ================= safety: inline assign form ================= */
 .assign-form {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 8px;
 	align-items: center;
 	margin: 0;
 	width: 100%;
 }
 
-	.assign-form input[type=text] {
-		flex: 1;
+	.assign-form input[type=text],
+	.assign-form input[type=tel] {
 		min-width: 0;
-		width: auto;
 		max-width: none;
 		height: 36px;
 		padding: 0 12px;
@@ -1188,13 +1189,143 @@ td.act {
 		outline: none;
 	}
 
-		.assign-form input[type=text]:focus {
+		.assign-form input[type=text]:focus,
+		.assign-form input[type=tel]:focus {
 			border-color: var(--accent);
 			box-shadow: 0 0 0 3px rgba(37, 99, 235, .18);
 		}
 
-.btn-sm {
-	height: 36px;
+	.assign-form .a-name {
+		flex: 1 1 140px;
+	}
+
+	.assign-form .a-mobile {
+		flex: 1 1 120px;
+	}
+
+/* ================= department: job stages + close ================= */
+.pill.wait {
+	background: var(--accent-soft);
+	color: var(--accent-dark);
+}
+
+.pill.closed {
+	background: #eef1f6;
+	color: var(--muted);
+}
+
+.inline-form {
+	display: inline;
+	margin: 0;
+}
+
+/* ================= safety: closed job ================= */
+.notice {
+	padding: 12px 16px;
+	border-radius: 8px;
+	background: var(--accent-soft);
+	color: var(--accent-dark);
+	border-left: 4px solid var(--accent);
+	font-size: .9rem;
+	font-weight: 500;
+}
+
+.closed-note {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.f input[readonly] {
+	background: var(--field);
+	color: var(--ink-2);
+}
+.worker-row .w-pass {
+	flex: 0 0 32%;
+}
+
+.worker-row .w-name {
+	flex: 1;
+}
+
+@media (max-width: 560px) {
+	.worker-row {
+		flex-wrap: wrap;
+	}
+
+		.worker-row .w-pass,
+		.worker-row .w-name {
+			flex: 1 1 100%;
+		}
+
+		.worker-row .act-btn {
+			height: 38px;
+		}
+}
+/* ================= final fixes ================= */
+
+/* placeholders */
+.f input::placeholder,
+.assign-form input::placeholder,
+.worker-row input::placeholder {
+	color: #94a3b8;
+}
+
+/* Details page: tel box exactly like the other inputs */
+.f input[type=tel] {
+	width: 100%;
+	height: 46px;
 	padding: 0 14px;
+}
+
+/* Work list / Dashboard row: name + mobile + button, same height */
+.assign-form input[type=text],
+.assign-form input[type=tel] {
 	font-size: .875rem;
+	transition: border-color .12s, box-shadow .12s;
+}
+
+.assign-form .a-name {
+	flex: 1 1 140px;
+}
+
+.assign-form .a-mobile {
+	flex: 1 1 120px;
+}
+
+.assign-form .btn-sm {
+	flex: none;
+}
+
+/* Worker rows: make the pass no box narrower than the name box */
+.worker-row input.w-pass {
+	flex: 0 0 32%;
+}
+
+.worker-row input.w-name {
+	flex: 1 1 0;
+}
+
+/* phones */
+@media (max-width: 760px) {
+	.assign-form {
+		justify-content: flex-end;
+	}
+
+		.assign-form .a-name,
+		.assign-form .a-mobile {
+			flex: 1 1 100%;
+		}
+
+		.assign-form .btn-sm {
+			width: 100%;
+		}
+}
+
+@media (max-width: 560px) {
+	.worker-row input.w-pass,
+	.worker-row input.w-name {
+		flex: 1 1 100%;
+	}
 }

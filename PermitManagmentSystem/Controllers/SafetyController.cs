@@ -2,6 +2,7 @@
 using System.Data.Entity;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Web;
 using System.Web.Mvc;
 using PermitManagmentSystem.Data;
@@ -10,7 +11,8 @@ using PermitManagmentSystem.Models.DTOs;
 
 namespace PermitManagmentSystem.Controllers
 {
-    // Safety sees the work saved by EVERY department and records the Safety Steward.
+    // Safety sees the work saved by EVERY department, records the Safety Steward,
+    // and does the final close after the department has closed the job.
     [Authorize(Roles = AppRoles.Safety)]
     public class SafetyController : Controller
     {
@@ -19,6 +21,8 @@ namespace PermitManagmentSystem.Controllers
 
         // Same folder the Operation side saves attachments in - change if yours is different
         private const string AttachmentFolder = "~/App_Data/Permits/";
+
+        private static readonly Regex MobileRx = new Regex(@"^\+?[0-9\s\-]{10,15}$");
 
         public ActionResult Index()
         {
@@ -38,7 +42,10 @@ namespace PermitManagmentSystem.Controllers
                 WorkStartDate = t.WorkStartDate,
                 ExpectedEndDate = t.ExpectedEndDate,
                 WorkerCount = t.Workers.Count(),
-                SafetyStewardName = t.SafetyStewardName
+                SafetyStewardName = t.SafetyStewardName,
+                SafetyStewardMobile = t.SafetyStewardMobile,
+                ClosedOn = t.ClosedOn,
+                FinalClosedOn = t.FinalClosedOn
             });
         }
 
@@ -58,10 +65,18 @@ namespace PermitManagmentSystem.Controllers
                 AwaitingSteward = awaiting,
                 StewardAssigned = total - awaiting,
                 WorkersOnPermits = _db.PermitWorkers.Count(),
+                AwaitingFinalClose = _db.PermitTasks.Count(t => t.ClosedOn != null && t.FinalClosedOn == null),
+                FinalClosed = _db.PermitTasks.Count(t => t.FinalClosedOn != null),
 
                 LatestAwaiting = ToRows(_db.PermitTasks
                         .Where(t => t.SafetyStewardName == null)
                         .OrderByDescending(t => t.CreatedOn).ThenByDescending(t => t.Id)
+                        .Take(10))
+                    .ToList(),
+
+                FinalCloseList = ToRows(_db.PermitTasks
+                        .Where(t => t.ClosedOn != null && t.FinalClosedOn == null)
+                        .OrderByDescending(t => t.ClosedOn).ThenByDescending(t => t.Id)
                         .Take(10))
                     .ToList(),
 
@@ -76,6 +91,8 @@ namespace PermitManagmentSystem.Controllers
             };
 
             foreach (var r in model.LatestAwaiting)
+                r.DepartmentName = QmsDbContext.NameOf(names, r.DepartmentId);
+            foreach (var r in model.FinalCloseList)
                 r.DepartmentName = QmsDbContext.NameOf(names, r.DepartmentId);
 
             // work saved by departments per day, last 30 days (empty days = 0)
@@ -94,7 +111,7 @@ namespace PermitManagmentSystem.Controllers
             return View(model);
         }
 
-        // GET: /Safety/Tasks?q=...&status=pending|done
+        // GET: /Safety/Tasks?q=...&status=pending|done|closing|closed
         public ActionResult Tasks(string q, string status)
         {
             var query = _db.PermitTasks.AsQueryable();
@@ -103,11 +120,14 @@ namespace PermitManagmentSystem.Controllers
             {
                 q = q.Trim();
                 query = query.Where(t => t.Permit.PermitNo.Contains(q) || t.Permit.WorkLocation.Contains(q)
-                                      || t.SupervisorName.Contains(q) || t.SafetyStewardName.Contains(q));
+                                      || t.SupervisorName.Contains(q) || t.SafetyStewardName.Contains(q)
+                                      || t.SafetyStewardMobile.Contains(q));
             }
 
             if (status == "pending") query = query.Where(t => t.SafetyStewardName == null);
-            else if (status == "done") query = query.Where(t => t.SafetyStewardName != null);
+            else if (status == "done") query = query.Where(t => t.SafetyStewardName != null && t.ClosedOn == null);
+            else if (status == "closing") query = query.Where(t => t.ClosedOn != null && t.FinalClosedOn == null);
+            else if (status == "closed") query = query.Where(t => t.FinalClosedOn != null);
 
             var items = ToRows(query.OrderByDescending(t => t.CreatedOn).ThenByDescending(t => t.Id).Take(200)).ToList();
 
@@ -117,21 +137,28 @@ namespace PermitManagmentSystem.Controllers
             return View(new SafetyTaskListDto { Items = items, Query = q, Status = status });
         }
 
-        // POST: /Safety/AssignSteward  - one row: pick a job, type the steward, Save
+        // POST: /Safety/AssignSteward - one row: type the steward name and mobile no, Save
         [HttpPost, ValidateAntiForgeryToken]
-        public ActionResult AssignSteward(int taskId, string steward, string returnTo, string q, string status)
+        public ActionResult AssignSteward(int taskId, string steward, string mobile, string returnTo, string q, string status)
         {
             var task = _db.PermitTasks.Include(t => t.Permit).FirstOrDefault(t => t.Id == taskId);
             if (task == null) return HttpNotFound();
 
             steward = (steward ?? "").Trim();
-            if (steward.Length == 0)
+            mobile = (mobile ?? "").Trim();
+
+            if (task.ClosedOn != null)
+                TempData["Error"] = "Permit " + task.Permit.PermitNo + " is closed. The Safety Steward can no longer be changed.";
+            else if (steward.Length == 0)
                 TempData["Error"] = "Enter the Safety Steward name for permit " + task.Permit.PermitNo + ".";
             else if (steward.Length > 150)
                 TempData["Error"] = "Safety Steward can be up to 150 characters.";
+            else if (!MobileRx.IsMatch(mobile))
+                TempData["Error"] = "Enter a valid mobile no (10 to 15 digits) for permit " + task.Permit.PermitNo + ".";
             else
             {
                 task.SafetyStewardName = steward;
+                task.SafetyStewardMobile = mobile;
                 task.SafetyUpdatedBy = User.Identity.Name;
                 task.SafetyUpdatedOn = DateTime.Now;
                 _db.SaveChanges();
@@ -143,13 +170,42 @@ namespace PermitManagmentSystem.Controllers
             return RedirectToAction("Dashboard");
         }
 
+        // POST: /Safety/FinalClose - only after the department has closed the job
+        [HttpPost, ValidateAntiForgeryToken]
+        public ActionResult FinalClose(int taskId, string returnTo, string q, string status)
+        {
+            var task = _db.PermitTasks.Include(t => t.Permit).FirstOrDefault(t => t.Id == taskId);
+            if (task == null) return HttpNotFound();
+
+            if (task.FinalClosedOn != null)
+                TempData["Error"] = "Permit " + task.Permit.PermitNo + " is already final closed.";
+            else if (task.ClosedOn == null)
+                TempData["Error"] = "The department has not closed permit " + task.Permit.PermitNo + " yet.";
+            else
+            {
+                task.FinalClosedOn = DateTime.Now;
+                task.FinalClosedBy = User.Identity.Name;
+                _db.SaveChanges();
+                TempData["Flash"] = "Permit " + task.Permit.PermitNo + " is final closed.";
+            }
+
+            if (returnTo == "tasks" || returnTo == "steward")
+                return RedirectToAction("Tasks", new { q = q, status = status });
+            return RedirectToAction("Dashboard");
+        }
+
         // GET: /Safety/Steward/5   (5 = task id)
         public ActionResult Steward(int id)
         {
             var task = _db.PermitTasks.Include(t => t.Permit).Include(t => t.Workers).FirstOrDefault(t => t.Id == id);
             if (task == null) return HttpNotFound();
 
-            var dto = new SafetyStewardDto { TaskId = task.Id, SafetyStewardName = task.SafetyStewardName };
+            var dto = new SafetyStewardDto
+            {
+                TaskId = task.Id,
+                SafetyStewardName = task.SafetyStewardName,
+                SafetyStewardMobile = task.SafetyStewardMobile
+            };
             FillInfo(dto, task);
             return View(dto);
         }
@@ -161,8 +217,11 @@ namespace PermitManagmentSystem.Controllers
             var task = _db.PermitTasks.Include(t => t.Permit).Include(t => t.Workers).FirstOrDefault(t => t.Id == model.TaskId);
             if (task == null) return HttpNotFound();
 
-            if (string.IsNullOrWhiteSpace(model.SafetyStewardName))
-                ModelState.AddModelError("SafetyStewardName", "Safety steward is required");
+            if (task.ClosedOn != null)
+            {
+                TempData["Error"] = "Permit " + task.Permit.PermitNo + " is closed. The Safety Steward can no longer be changed.";
+                return RedirectToAction("Tasks");
+            }
 
             if (!ModelState.IsValid)
             {
@@ -171,6 +230,7 @@ namespace PermitManagmentSystem.Controllers
             }
 
             task.SafetyStewardName = model.SafetyStewardName.Trim();
+            task.SafetyStewardMobile = model.SafetyStewardMobile.Trim();
             task.SafetyUpdatedBy = User.Identity.Name;
             task.SafetyUpdatedOn = DateTime.Now;
             _db.SaveChanges();
@@ -196,6 +256,10 @@ namespace PermitManagmentSystem.Controllers
         {
             var p = t.Permit;
             dto.IsEdit = t.SafetyStewardName != null;
+            dto.IsClosed = t.ClosedOn != null;
+            dto.ClosedOn = t.ClosedOn;
+            dto.IsFinalClosed = t.FinalClosedOn != null;
+            dto.FinalClosedOn = t.FinalClosedOn;
             dto.PermitId = p.Id;
             dto.PermitNo = p.PermitNo;
             dto.DepartmentName = QmsDbContext.NameOf(_qms.GetDepartmentNames(), p.DepartmentId);
@@ -208,7 +272,9 @@ namespace PermitManagmentSystem.Controllers
             dto.SupervisorName = t.SupervisorName;
             dto.WorkStartDate = t.WorkStartDate;
             dto.ExpectedEndDate = t.ExpectedEndDate;
-            dto.WorkerPassNos = t.Workers.OrderBy(w => w.Id).Select(w => w.PassNo).ToList();
+            dto.Workers = t.Workers.OrderBy(w => w.Id)
+                .Select(w => new SafetyWorkerDto { PassNo = w.PassNo, WorkerName = w.WorkerName })
+                .ToList();
         }
 
         protected override void Dispose(bool disposing)

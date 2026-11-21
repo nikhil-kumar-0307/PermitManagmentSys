@@ -12,6 +12,10 @@ namespace PermitManagmentSystem.Models.DTOs
         public int Assigned { get; set; }
         public int EndingThisWeek { get; set; }
         public int WorkersDeployed { get; set; }
+        public int AwaitingSafety { get; set; }     // work saved, Safety has not added the steward yet
+        public int ReadyToClose { get; set; }       // steward assigned, department can close
+        public int Closed { get; set; }             // fully closed (Safety final close done)
+        public List<DepartmentPermitRowDto> ReadyList { get; set; } = new List<DepartmentPermitRowDto>();
 
         public List<DepartmentPermitRowDto> LatestAwaiting { get; set; } = new List<DepartmentPermitRowDto>();
         public List<UpcomingWorkDto> Upcoming { get; set; } = new List<UpcomingWorkDto>();
@@ -32,6 +36,28 @@ namespace PermitManagmentSystem.Models.DTOs
         public string SupervisorName { get; set; }
         public DateTime? ExpectedEndDate { get; set; }
         public int WorkerCount { get; set; }
+
+        public string SafetyStewardName { get; set; }
+        public string SafetyStewardMobile { get; set; }
+        public DateTime? ClosedOn { get; set; }          // closed by the department
+        public DateTime? FinalClosedOn { get; set; }     // final closed by Safety
+
+        // "pending" -> department must assign work
+        // "safety"  -> waiting for Safety steward
+        // "ready"   -> steward assigned, department can close
+        // "closing" -> department closed, waiting for Safety final close
+        // "closed"  -> fully finished
+        public string Stage
+        {
+            get
+            {
+                if (!HasTask) return "pending";
+                if (FinalClosedOn.HasValue) return "closed";
+                if (ClosedOn.HasValue) return "closing";
+                if (string.IsNullOrEmpty(SafetyStewardName)) return "safety";
+                return "ready";
+            }
+        }
     }
 
     public class UpcomingWorkDto
@@ -48,7 +74,16 @@ namespace PermitManagmentSystem.Models.DTOs
     {
         public List<DepartmentPermitRowDto> Items { get; set; } = new List<DepartmentPermitRowDto>();
         public string Query { get; set; }
-        public string Status { get; set; }      // "", "pending", "assigned"
+        public string Status { get; set; }      // "", "pending", "safety", "ready", "closing", "closed"
+    }
+
+    public class WorkerInputDto
+    {
+        [StringLength(50)]
+        public string PassNo { get; set; }
+
+        [StringLength(150)]
+        public string WorkerName { get; set; }
     }
 
     // Used by the Assign / Edit-task form
@@ -67,6 +102,11 @@ namespace PermitManagmentSystem.Models.DTOs
         public string AttachmentFileName { get; set; }
         public bool IsEdit { get; set; }
 
+        // ---- set when Safety has assigned the steward: the work is locked (view only) ----
+        public bool IsLocked { get; set; }
+        public string SafetyStewardName { get; set; }
+        public string SafetyStewardMobile { get; set; }
+
         // ---- fields the department fills ----
         [Required(ErrorMessage = "Work start date is required")]
         [DataType(DataType.Date)]
@@ -83,7 +123,7 @@ namespace PermitManagmentSystem.Models.DTOs
         [Display(Name = "Supervisor name")]
         public string SupervisorName { get; set; }
 
-        // One text box per worker, all named "WorkerPassNos"
-        public List<string> WorkerPassNos { get; set; } = new List<string>();
+        // One row per worker: Workers[0].PassNo, Workers[0].WorkerName, ...
+        public List<WorkerInputDto> Workers { get; set; } = new List<WorkerInputDto>();
     }
 }

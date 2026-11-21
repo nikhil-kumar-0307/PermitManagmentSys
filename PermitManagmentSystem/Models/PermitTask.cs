@@ -37,10 +37,25 @@ namespace PermitManagmentSystem.Models
         [StringLength(150)]
         public string SafetyStewardName { get; set; }
 
+        [StringLength(15)]
+        public string SafetyStewardMobile { get; set; }
+
         [StringLength(100)]
         public string SafetyUpdatedBy { get; set; }
 
         public DateTime? SafetyUpdatedOn { get; set; }
+
+        // ---- filled when the department closes the job (null while open) ----
+        public DateTime? ClosedOn { get; set; }
+
+        [StringLength(100)]
+        public string ClosedBy { get; set; }
+
+        // ---- filled when Safety does the final close (null until then) ----
+        public DateTime? FinalClosedOn { get; set; }
+
+        [StringLength(100)]
+        public string FinalClosedBy { get; set; }
 
         public virtual ICollection<PermitWorker> Workers { get; set; } = new List<PermitWorker>();
     }
@@ -60,5 +75,8 @@ namespace PermitManagmentSystem.Models
         [Required, StringLength(50)]
         [Index("IX_PermitWorker_Task_Pass", 2, IsUnique = true)]
         public string PassNo { get; set; }
+
+        [StringLength(150)]
+        public string WorkerName { get; set; }
     }
 }

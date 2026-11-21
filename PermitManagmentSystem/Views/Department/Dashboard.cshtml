@@ -29,10 +29,6 @@
 </div>
 
 <section class="kpis" aria-label="Department summary">
-    <div class="kpi">
-        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></svg></div>
-        <div><div class="l">Permits received</div><div class="n">@Model.TotalPermits</div><div class="h">All time</div></div>
-    </div>
     <div class="kpi @(Model.AwaitingAssignment > 0 ? "warn" : "ok")">
         <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div>
         <div>
@@ -42,12 +38,20 @@
         </div>
     </div>
     <div class="kpi">
-        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 11h18" /></svg></div>
-        <div><div class="l">Work assigned</div><div class="n">@Model.Assigned</div><div class="h">@Model.EndingThisWeek ending in 7 days</div></div>
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /></svg></div>
+        <div><div class="l">With Safety</div><div class="n">@Model.AwaitingSafety</div><div class="h">Waiting for a Safety Steward</div></div>
+    </div>
+    <div class="kpi @(Model.ReadyToClose > 0 ? "warn" : "ok")">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /><path d="M9 12l2 2 4-4" /></svg></div>
+        <div>
+            <div class="l">Ready to close</div>
+            <div class="n">@Model.ReadyToClose</div>
+            <div class="h">@(Model.ReadyToClose > 0 ? "Safety steward assigned" : "Nothing to close")</div>
+        </div>
     </div>
     <div class="kpi">
-        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.5a6.5 6.5 0 0 1 3.5 5.5" /></svg></div>
-        <div><div class="l">Workers on permits</div><div class="n">@Model.WorkersDeployed</div><div class="h">Pass numbers entered</div></div>
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 11h18" /></svg></div>
+        <div><div class="l">Closed jobs</div><div class="n">@Model.Closed</div><div class="h">@Model.TotalPermits permits received in all</div></div>
     </div>
 </section>
 
@@ -117,6 +121,59 @@
         }
     </section>
 </div>
+
+<section class="panel" style="margin-bottom:20px">
+    <div class="panel-head">
+        <h2>Ready to close</h2>
+        <a href="@Url.Action("Permits", "Department", new { status = "ready" })">View all</a>
+    </div>
+
+    @if (!Model.ReadyList.Any())
+    {
+        <div class="empty">No jobs are waiting to be closed. Jobs appear here once Safety has assigned a steward.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-fixed cards">
+                <colgroup>
+                    <col style="width:14%" />
+                    <col style="width:22%" />
+                    <col style="width:20%" />
+                    <col style="width:16%" />
+                    <col style="width:28%" />
+                </colgroup>
+                <thead><tr><th>Permit no</th><th>Work location</th><th>Safety Steward</th><th>Expected end</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var p in Model.ReadyList)
+                    {
+                        <tr>
+                            <td class="no" data-label="Permit no"><a href="@Url.Action("Assign", "Department", new { id = p.Id })">@p.PermitNo</a></td>
+                            <td data-label="Work location">@p.WorkLocation</td>
+                            <td data-label="Safety Steward">
+                                <strong>@p.SafetyStewardName</strong>
+                                @if (!string.IsNullOrEmpty(p.SafetyStewardMobile))
+                                {
+                                    <div class="muted">@p.SafetyStewardMobile</div>
+                                }
+                            </td>
+                            <td class="date" data-label="Expected end">@(p.ExpectedEndDate.HasValue ? p.ExpectedEndDate.Value.ToString("dd MMM yyyy") : "")</td>
+                            <td class="act">
+                                @using (Html.BeginForm("Close", "Department", FormMethod.Post, new { @class = "inline-form", onsubmit = "return confirm('Close this permit? It cannot be edited after closing.');" }))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@p.Id" />
+                                    <input type="hidden" name="returnTo" value="dashboard" />
+                                    <button type="submit" class="act-btn danger">Close job</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
 
 <section class="panel">
     <div class="panel-head">

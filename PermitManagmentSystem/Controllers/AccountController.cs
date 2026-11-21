@@ -11,7 +11,7 @@ namespace PermitManagmentSystem.Controllers
 {
     public class AccountController : Controller
     {
-        // TODO: replace with your real DbContext (must expose DbSet<User> Users)
+
         private readonly ApplicationDbContext _db = new ApplicationDbContext();
         private readonly QmsDbContext _qms = new QmsDbContext();   // read-only, used to find a department's id by name
 
@@ -43,8 +43,7 @@ namespace PermitManagmentSystem.Controllers
                 .Where(u => u.Username == username)
                 .ToList()
                 .FirstOrDefault(u => string.Equals(u.Password, password, StringComparison.Ordinal));
-
-            // One generic message so the screen never reveals which part was wrong.
+            
             if (user == null)
             {
                 ModelState.AddModelError("", "Username or password is incorrect.");
@@ -59,7 +58,7 @@ namespace PermitManagmentSystem.Controllers
                 return View(model);
             }
 
-            // A department login: find its department in QMS by name (the id is stored on permits).
+            // A department login: find its department in QMS by name.
             int? departmentId = null;
             if (string.Equals((user.Role ?? "").Trim(), AppRoles.Department, StringComparison.OrdinalIgnoreCase))
             {

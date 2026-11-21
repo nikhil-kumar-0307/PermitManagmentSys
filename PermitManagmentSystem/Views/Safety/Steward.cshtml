@@ -17,18 +17,47 @@
 {
     @Html.AntiForgeryToken()
     @Html.HiddenFor(m => m.TaskId)
+    <input type="hidden" name="returnTo" value="steward" />
 
     <div class="form-shell">
         <aside class="form-aside">
-            <h2>@(Model.IsEdit ? "Update the steward" : "Add the steward")</h2>
-            <p>Review the permit and the work the department has set up, then record the Safety Steward for this job.</p>
+            <h2>
+                @(Model.IsFinalClosed ? "Job closed" :
+                  Model.IsClosed ? "Waiting for final close" :
+                  Model.IsEdit ? "Update the steward" : "Add the steward")
+            </h2>
+            <p>
+                @if (Model.IsClosed)
+                {
+                    @:The department has closed this job. Review the details, then do the final close.
+                }
+                else
+                {
+                    @:Review the permit and the work the department has set up, then record the Safety Steward and mobile no for this job.
+                }
+            </p>
             <ul>
                 <li>One Safety Steward per job</li>
-                <li>You can come back and edit later</li>
+                <li>Name and mobile no are required</li>
+                <li>The department closes first, then Safety does the final close</li>
             </ul>
         </aside>
 
         <div class="form-main">
+            @if (Model.IsFinalClosed)
+            {
+                <div class="notice" role="status">
+                    This job is fully closed@(Model.FinalClosedOn.HasValue ? " (final close on " + Model.FinalClosedOn.Value.ToString("dd MMM yyyy") + ")" : "").
+                </div>
+            }
+            else if (Model.IsClosed)
+            {
+                <div class="notice" role="status">
+                    The department closed this job@(Model.ClosedOn.HasValue ? " on " + Model.ClosedOn.Value.ToString("dd MMM yyyy") : "").
+                    It is waiting for the Safety final close.
+                </div>
+            }
+
             <section class="fsec">
                 <h3>Permit details</h3>
                 <p class="fsub">Issued by Operation. Read only.</p>
@@ -72,11 +101,13 @@
     </div>
     <div><dt>Work dates</dt><dd>@Model.WorkStartDate.ToString("dd MMM yyyy") &ndash; @Model.ExpectedEndDate.ToString("dd MMM yyyy")</dd></div>
     <div class="full">
-        <dt>Workers (pass no)</dt>
+        <dt>Workers (pass no &ndash; name)</dt>
         <dd>
             <div class="chips">
-                @foreach (var pass in Model.WorkerPassNos)
-                {<span class="chip">@pass</span>}
+                @foreach (var w in Model.Workers)
+                {
+                    <span class="chip">@w.PassNo@(string.IsNullOrEmpty(w.WorkerName) ? "" : " – " + w.WorkerName)</span>
+                }
             </div>
         </dd>
     </div>
@@ -85,19 +116,51 @@
 
     <section class="fsec">
         <h3>Safety</h3>
-        <p class="fsub">Who is the Safety Steward for this job.</p>
+        <p class="fsub">Who is the Safety Steward for this job, and how to reach them.</p>
         <div class="fields">
-            <div class="f full">
+            <div class="f">
                 @Html.LabelFor(m => m.SafetyStewardName)
-                @Html.TextBoxFor(m => m.SafetyStewardName, new { maxlength = 150, autocomplete = "off" })
+                @if (Model.IsClosed)
+                {
+                    @Html.TextBoxFor(m => m.SafetyStewardName, new { @readonly = "readonly", autocomplete = "off" })
+                }
+                else
+                {
+                    @Html.TextBoxFor(m => m.SafetyStewardName, new { maxlength = 150, autocomplete = "off", placeholder = "Safety Steward name" })
+                }
                 @Html.ValidationMessageFor(m => m.SafetyStewardName, "", new { @class = "err" })
+            </div>
+
+            <div class="f">
+                @Html.LabelFor(m => m.SafetyStewardMobile)
+                @if (Model.IsClosed)
+                {
+                    @Html.TextBoxFor(m => m.SafetyStewardMobile, new { type = "text", inputmode = "tel", @readonly = "readonly", autocomplete = "off" })
+                }
+                else
+                {
+                    @Html.TextBoxFor(m => m.SafetyStewardMobile, new { type = "text", inputmode = "tel", maxlength = 15, autocomplete = "off", placeholder = "e.g. 9876543210" })
+                }
+                @Html.ValidationMessageFor(m => m.SafetyStewardMobile, "", new { @class = "err" })
             </div>
         </div>
     </section>
 
     <div class="form-actions">
-        <a class="btn btn-ghost" href="@Url.Action("Tasks", "Safety")">Cancel</a>
-        <button type="submit" class="btn">Save</button>
+        <a class="btn btn-ghost" href="@Url.Action("Tasks", "Safety")">@(Model.IsClosed ? "Back" : "Cancel")</a>
+
+        @if (!Model.IsClosed)
+        {
+            <button type="submit" class="btn">Save</button>
+        }
+        else if (Model.CanFinalClose)
+        {
+            <button type="submit" class="btn btn-danger"
+                    formaction="@Url.Action("FinalClose", "Safety")" formmethod="post"
+                    onclick="return confirm('Final close this job? This cannot be undone.');">
+                Final close
+            </button>
+        }
     </div>
     </div>
     </div>

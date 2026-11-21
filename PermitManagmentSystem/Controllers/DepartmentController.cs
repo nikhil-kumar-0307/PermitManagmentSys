@@ -74,7 +74,11 @@ namespace PermitManagmentSystem.Controllers
                 HasTask = _db.PermitTasks.Any(t => t.PermitId == p.Id),
                 SupervisorName = _db.PermitTasks.Where(t => t.PermitId == p.Id).Select(t => t.SupervisorName).FirstOrDefault(),
                 ExpectedEndDate = _db.PermitTasks.Where(t => t.PermitId == p.Id).Select(t => (DateTime?)t.ExpectedEndDate).FirstOrDefault(),
-                WorkerCount = _db.PermitWorkers.Count(w => w.PermitTask.PermitId == p.Id)
+                WorkerCount = _db.PermitWorkers.Count(w => w.PermitTask.PermitId == p.Id),
+                SafetyStewardName = _db.PermitTasks.Where(t => t.PermitId == p.Id).Select(t => t.SafetyStewardName).FirstOrDefault(),
+                SafetyStewardMobile = _db.PermitTasks.Where(t => t.PermitId == p.Id).Select(t => t.SafetyStewardMobile).FirstOrDefault(),
+                ClosedOn = _db.PermitTasks.Where(t => t.PermitId == p.Id).Select(t => t.ClosedOn).FirstOrDefault(),
+                FinalClosedOn = _db.PermitTasks.Where(t => t.PermitId == p.Id).Select(t => t.FinalClosedOn).FirstOrDefault()
             });
         }
 
@@ -97,7 +101,16 @@ namespace PermitManagmentSystem.Controllers
                 TotalPermits = total,
                 Assigned = assigned,
                 AwaitingAssignment = total - assigned,
-                EndingThisWeek = myTasks.Count(t => t.ExpectedEndDate >= today && t.ExpectedEndDate <= weekEnd),
+                EndingThisWeek = myTasks.Count(t => t.ClosedOn == null && t.ExpectedEndDate >= today && t.ExpectedEndDate <= weekEnd),
+                AwaitingSafety = myTasks.Count(t => t.SafetyStewardName == null),
+                ReadyToClose = myTasks.Count(t => t.SafetyStewardName != null && t.ClosedOn == null),
+                Closed = myTasks.Count(t => t.FinalClosedOn != null),
+
+                ReadyList = ToRows(
+                        mine.Where(p => _db.PermitTasks.Any(t => t.PermitId == p.Id && t.SafetyStewardName != null && t.ClosedOn == null))
+                            .OrderByDescending(p => p.IssueDate).ThenByDescending(p => p.Id)
+                            .Take(10))
+                    .ToList(),
                 WorkersDeployed = _db.PermitWorkers.Count(w => w.PermitTask.Permit.DepartmentId == _deptId),
 
                 LatestAwaiting = ToRows(
@@ -107,7 +120,7 @@ namespace PermitManagmentSystem.Controllers
                     .ToList(),
 
                 Upcoming = myTasks
-                    .Where(t => t.ExpectedEndDate >= today)
+                    .Where(t => t.ClosedOn == null && t.ExpectedEndDate >= today)
                     .OrderBy(t => t.ExpectedEndDate).ThenBy(t => t.Id)
                     .Take(5)
                     .Select(t => new UpcomingWorkDto
@@ -137,7 +150,7 @@ namespace PermitManagmentSystem.Controllers
             return View(model);
         }
 
-        // GET: /Department/Permits?q=...&status=pending|assigned
+        // GET: /Department/Permits?q=...&status=pending|safety|ready|closing|closed
         public ActionResult Permits(string q, string status)
         {
             var query = _db.Permits.Where(p => p.DepartmentId == _deptId);
@@ -150,10 +163,16 @@ namespace PermitManagmentSystem.Controllers
                                       || p.PermitIssueBy.Contains(q));
             }
 
-            if (status == "pending")
+            if (status == "pending")        // department has not assigned the work yet
                 query = query.Where(p => !_db.PermitTasks.Any(t => t.PermitId == p.Id));
-            else if (status == "assigned")
-                query = query.Where(p => _db.PermitTasks.Any(t => t.PermitId == p.Id));
+            else if (status == "safety")    // waiting for the Safety steward
+                query = query.Where(p => _db.PermitTasks.Any(t => t.PermitId == p.Id && t.SafetyStewardName == null));
+            else if (status == "ready")     // steward assigned, can be closed
+                query = query.Where(p => _db.PermitTasks.Any(t => t.PermitId == p.Id && t.SafetyStewardName != null && t.ClosedOn == null));
+            else if (status == "closing")   // closed by department, waiting for Safety final close
+                query = query.Where(p => _db.PermitTasks.Any(t => t.PermitId == p.Id && t.ClosedOn != null && t.FinalClosedOn == null));
+            else if (status == "closed")    // fully closed by Safety
+                query = query.Where(p => _db.PermitTasks.Any(t => t.PermitId == p.Id && t.FinalClosedOn != null));
 
             var model = new DepartmentPermitListDto
             {
@@ -164,7 +183,8 @@ namespace PermitManagmentSystem.Controllers
             return View(model);
         }
 
-        // GET: /Department/Assign/5   (5 = permit id) - opens the task, or edits it if it already exists
+        // GET: /Department/Assign/5   (5 = permit id)
+        // new task -> form, existing task -> edit form, steward assigned -> read-only view
         public ActionResult Assign(int id)
         {
             var permit = _db.Permits.FirstOrDefault(p => p.Id == id && p.DepartmentId == _deptId);
@@ -174,19 +194,32 @@ namespace PermitManagmentSystem.Controllers
             FillPermitInfo(dto, permit);
 
             var task = _db.PermitTasks.Include(t => t.Workers).FirstOrDefault(t => t.PermitId == id);
+            if (task != null && task.ClosedOn != null)
+            {
+                TempData["Error"] = "Permit " + permit.PermitNo + " is closed and can no longer be edited.";
+                return RedirectToAction("Permits");
+            }
             if (task != null)
             {
                 dto.IsEdit = true;
                 dto.WorkStartDate = task.WorkStartDate;
                 dto.ExpectedEndDate = task.ExpectedEndDate;
                 dto.SupervisorName = task.SupervisorName;
-                dto.WorkerPassNos = task.Workers.OrderBy(w => w.Id).Select(w => w.PassNo).ToList();
+                dto.Workers = task.Workers
+                    .OrderBy(w => w.Id)
+                    .Select(w => new WorkerInputDto { PassNo = w.PassNo, WorkerName = w.WorkerName })
+                    .ToList();
+
+                // Safety has assigned the steward: show the steward and lock the work
+                dto.SafetyStewardName = task.SafetyStewardName;
+                dto.SafetyStewardMobile = task.SafetyStewardMobile;
+                dto.IsLocked = !string.IsNullOrEmpty(task.SafetyStewardName);
             }
             else
             {
                 dto.WorkStartDate = DateTime.Today;
             }
-            if (dto.WorkerPassNos.Count == 0) dto.WorkerPassNos.Add("");
+            if (dto.Workers.Count == 0) dto.Workers.Add(new WorkerInputDto());
 
             return View(dto);
         }
@@ -198,30 +231,57 @@ namespace PermitManagmentSystem.Controllers
             var permit = _db.Permits.FirstOrDefault(p => p.Id == model.PermitId && p.DepartmentId == _deptId);
             if (permit == null) return HttpNotFound();
 
-            // clean the pass numbers: trim, drop blanks
-            var passes = (model.WorkerPassNos ?? new List<string>())
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .Select(s => s.Trim())
+            var task = _db.PermitTasks.Include(t => t.Workers).FirstOrDefault(t => t.PermitId == permit.Id);
+
+            if (task != null && task.ClosedOn != null)
+            {
+                TempData["Error"] = "Permit " + permit.PermitNo + " is closed and can no longer be edited.";
+                return RedirectToAction("Permits");
+            }
+
+            // once Safety has assigned the steward the work can no longer be edited
+            if (task != null && !string.IsNullOrEmpty(task.SafetyStewardName))
+            {
+                TempData["Error"] = "A Safety Steward is assigned to permit " + permit.PermitNo + ". The work can no longer be edited.";
+                return RedirectToAction("Permits");
+            }
+
+            // clean the rows: trim, drop rows where both boxes are empty
+            var workers = (model.Workers ?? new List<WorkerInputDto>())
+                .Where(w => w != null && (!string.IsNullOrWhiteSpace(w.PassNo) || !string.IsNullOrWhiteSpace(w.WorkerName)))
+                .Select(w => new WorkerInputDto
+                {
+                    PassNo = (w.PassNo ?? "").Trim(),
+                    WorkerName = (w.WorkerName ?? "").Trim()
+                })
                 .ToList();
 
-            if (passes.Count == 0)
-                ModelState.AddModelError("WorkerPassNos", "Add at least one worker pass no.");
-            else if (passes.Any(s => s.Length > 50))
-                ModelState.AddModelError("WorkerPassNos", "A pass no can be up to 50 characters.");
-            else if (passes.Select(s => s.ToUpperInvariant()).Distinct().Count() != passes.Count)
-                ModelState.AddModelError("WorkerPassNos", "The same pass no is entered more than once.");
+            if (workers.Count == 0)
+                ModelState.AddModelError("Workers", "Add at least one worker.");
+            else if (workers.Any(w => w.PassNo.Length == 0))
+                ModelState.AddModelError("Workers", "Every worker needs a pass no.");
+            else if (workers.Any(w => w.WorkerName.Length == 0))
+                ModelState.AddModelError("Workers", "Every worker needs a name.");
+            else if (workers.Any(w => w.PassNo.Length > 50))
+                ModelState.AddModelError("Workers", "A pass no can be up to 50 characters.");
+            else if (workers.Any(w => w.WorkerName.Length > 150))
+                ModelState.AddModelError("Workers", "A worker name can be up to 150 characters.");
+            else if (workers.Select(w => w.PassNo.ToUpperInvariant()).Distinct().Count() != workers.Count)
+                ModelState.AddModelError("Workers", "The same pass no is entered more than once.");
 
             if (model.WorkStartDate.HasValue && model.ExpectedEndDate.HasValue
                 && model.ExpectedEndDate.Value.Date < model.WorkStartDate.Value.Date)
                 ModelState.AddModelError("ExpectedEndDate", "Expected end date cannot be before the start date.");
 
-            var task = _db.PermitTasks.Include(t => t.Workers).FirstOrDefault(t => t.PermitId == permit.Id);
-
             if (!ModelState.IsValid)
             {
                 FillPermitInfo(model, permit);
                 model.IsEdit = task != null;
-                if (model.WorkerPassNos == null || model.WorkerPassNos.Count == 0) model.WorkerPassNos = new List<string> { "" };
+                model.IsLocked = false;
+                // keep what the user typed so nothing is lost
+                model.Workers = workers.Count == 0 ? new List<WorkerInputDto> { new WorkerInputDto() } : workers;
+                // the view reads values from the model, so clear stale posted values
+                ModelState.Remove("Workers");
                 return View(model);
             }
 
@@ -240,12 +300,40 @@ namespace PermitManagmentSystem.Controllers
             task.WorkStartDate = model.WorkStartDate.Value.Date;
             task.ExpectedEndDate = model.ExpectedEndDate.Value.Date;
 
-            foreach (var pass in passes)
-                task.Workers.Add(new PermitWorker { PassNo = pass });
+            foreach (var w in workers)
+                task.Workers.Add(new PermitWorker { PassNo = w.PassNo, WorkerName = w.WorkerName });
 
             _db.SaveChanges();
 
             TempData["Flash"] = "Work saved for permit " + permit.PermitNo + ".";
+            return RedirectToAction("Permits");
+        }
+
+        // POST: /Department/Close  (id = permit id)
+        // Only after Safety has assigned the steward. After this, Safety does the final close.
+        [HttpPost, ValidateAntiForgeryToken]
+        public ActionResult Close(int id, string returnTo)
+        {
+            var permit = _db.Permits.FirstOrDefault(p => p.Id == id && p.DepartmentId == _deptId);
+            if (permit == null) return HttpNotFound();
+
+            var task = _db.PermitTasks.FirstOrDefault(t => t.PermitId == id);
+
+            if (task == null)
+                TempData["Error"] = "Assign the work for permit " + permit.PermitNo + " before closing it.";
+            else if (task.ClosedOn != null)
+                TempData["Error"] = "Permit " + permit.PermitNo + " is already closed.";
+            else if (string.IsNullOrEmpty(task.SafetyStewardName))
+                TempData["Error"] = "Safety has not assigned a steward to permit " + permit.PermitNo + " yet.";
+            else
+            {
+                task.ClosedOn = DateTime.Now;
+                task.ClosedBy = User.Identity.Name;
+                _db.SaveChanges();
+                TempData["Flash"] = "Permit " + permit.PermitNo + " is closed and sent to Safety for the final close.";
+            }
+
+            if (returnTo == "dashboard") return RedirectToAction("Dashboard");
             return RedirectToAction("Permits");
         }
 

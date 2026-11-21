@@ -35,6 +35,10 @@
         {
             <div class="flash" role="status">@TempData["Flash"]</div>
         }
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert" role="alert">@TempData["Error"]</div>
+        }
         @RenderBody()
     </main>
 
