@@ -38,7 +38,6 @@ namespace PermitManagmentSystem.Controllers
             var username = model.Username.Trim();
             var password = model.Password;
 
-            // Plain password comparison (case-sensitive, done in memory)
             var user = _db.Users
                 .Where(u => u.Username == username)
                 .ToList()

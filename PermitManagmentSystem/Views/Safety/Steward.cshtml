@@ -17,19 +17,17 @@
 {
     @Html.AntiForgeryToken()
     @Html.HiddenFor(m => m.TaskId)
-    <input type="hidden" name="returnTo" value="steward" />
 
     <div class="form-shell">
         <aside class="form-aside">
             <h2>
-                @(Model.IsFinalClosed ? "Job closed" :
-                  Model.IsClosed ? "Waiting for final close" :
+                @(Model.IsClosed ? "Job closed" :
                   Model.IsEdit ? "Update the steward" : "Add the steward")
             </h2>
             <p>
                 @if (Model.IsClosed)
                 {
-                    @:The department has closed this job. Review the details, then do the final close.
+                    @:The department has closed this job. The details are now read only.
                 }
                 else
                 {
@@ -39,22 +37,15 @@
             <ul>
                 <li>One Safety Steward per job</li>
                 <li>Name and mobile no are required</li>
-                <li>The department closes first, then Safety does the final close</li>
+                <li>The steward cannot be changed after the department closes the job</li>
             </ul>
         </aside>
 
         <div class="form-main">
-            @if (Model.IsFinalClosed)
-            {
-                <div class="notice" role="status">
-                    This job is fully closed@(Model.FinalClosedOn.HasValue ? " (final close on " + Model.FinalClosedOn.Value.ToString("dd MMM yyyy") + ")" : "").
-                </div>
-            }
-            else if (Model.IsClosed)
+            @if (Model.IsClosed)
             {
                 <div class="notice" role="status">
                     The department closed this job@(Model.ClosedOn.HasValue ? " on " + Model.ClosedOn.Value.ToString("dd MMM yyyy") : "").
-                    It is waiting for the Safety final close.
                 </div>
             }
 
@@ -148,18 +139,9 @@
 
     <div class="form-actions">
         <a class="btn btn-ghost" href="@Url.Action("Tasks", "Safety")">@(Model.IsClosed ? "Back" : "Cancel")</a>
-
         @if (!Model.IsClosed)
         {
             <button type="submit" class="btn">Save</button>
-        }
-        else if (Model.CanFinalClose)
-        {
-            <button type="submit" class="btn btn-danger"
-                    formaction="@Url.Action("FinalClose", "Safety")" formmethod="post"
-                    onclick="return confirm('Final close this job? This cannot be undone.');">
-                Final close
-            </button>
         }
     </div>
     </div>

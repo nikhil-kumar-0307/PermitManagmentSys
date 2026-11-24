@@ -1,0 +1,86 @@
+﻿@model PermitManagmentSystem.Models.DTOs.ClosureListDto
+@{
+    Layout = "~/Views/Shared/_OperationLayout.cshtml";
+    ViewBag.Title = "Final close";
+}
+
+<div class="page-head">
+    <div>
+        <h1>Final close</h1>
+        <p>Jobs closed by the departments. Do the final close here.</p>
+    </div>
+</div>
+
+<form class="toolbar" method="get" action="@Url.Action("Closures", "Operation")">
+    <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+        <input type="search" name="q" value="@Model.Query" placeholder="Search permit no, location, supervisor or steward" aria-label="Search closed jobs" />
+    </div>
+    <div class="size-pick">
+        <label for="status">Status</label>
+        <select id="status" name="status" onchange="this.form.submit()">
+            <option value="" selected="@(string.IsNullOrEmpty(Model.Status))">All</option>
+            <option value="closing" selected="@(Model.Status == "closing")">Awaiting final close</option>
+            <option value="closed" selected="@(Model.Status == "closed")">Final closed</option>
+        </select>
+    </div>
+    <button class="btn" type="submit">Search</button>
+</form>
+
+@if (!Model.Items.Any())
+{
+    <div class="table-wrap"><div class="empty"><h2>No jobs found</h2><p>Try a different search or status.</p></div></div>
+}
+else
+{
+    <div class="table-wrap">
+        <table class="table-fixed cards">
+            <colgroup>
+                <col style="width:10%" />
+                <col style="width:14%" />
+                <col style="width:16%" />
+                <col style="width:13%" />
+                <col style="width:17%" />
+                <col style="width:11%" />
+                <col style="width:19%" />
+            </colgroup>
+            <thead><tr><th>Permit no</th><th>Department</th><th>Work location</th><th>Supervisor</th><th>Safety Steward</th><th>Closed on</th><th>Status</th></tr></thead>
+            <tbody>
+                @foreach (var t in Model.Items)
+                {
+                    <tr>
+                        <td class="no" data-label="Permit no">@t.PermitNo</td>
+                        <td data-label="Department">@t.DepartmentName</td>
+                        <td data-label="Work location">@t.WorkLocation</td>
+                        <td data-label="Supervisor">@t.SupervisorName</td>
+                        <td data-label="Safety Steward">
+                            <strong>@t.SafetyStewardName</strong>
+                            @if (!string.IsNullOrEmpty(t.SafetyStewardMobile))
+                            {<div class="muted">@t.SafetyStewardMobile</div>}
+                        </td>
+                        <td class="date" data-label="Closed on">@(t.ClosedOn.HasValue ? t.ClosedOn.Value.ToString("dd MMM yyyy") : "")</td>
+                        <td class="act" data-label="Status">
+                            @if (t.IsFinalClosed)
+                            {
+                                <span class="pill closed">Final closed</span>
+                            }
+                            else if (t.CanFinalClose)
+                            {
+                                using (Html.BeginForm("FinalClose", "Operation", FormMethod.Post, new { @class = "inline-form", onsubmit = "return confirm('Final close this job? This cannot be undone.');" }))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="taskId" value="@t.TaskId" />
+                                    <input type="hidden" name="returnTo" value="closures" />
+                                    <input type="hidden" name="q" value="@Model.Query" />
+                                    <input type="hidden" name="status" value="@Model.Status" />
+                                    <button type="submit" class="act-btn danger">Final close</button>
+                                }
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="hint">Showing the latest @Model.Items.Count jobs. Use search to narrow the list.</p>
+}

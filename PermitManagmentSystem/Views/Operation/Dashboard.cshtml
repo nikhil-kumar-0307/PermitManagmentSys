@@ -52,6 +52,14 @@
             <div class="h">@(Model.WithoutAttachment > 0 ? "Open All permits to add the document" : "Every permit has a document")</div>
         </div>
     </div>
+    <div class="kpi @(Model.AwaitingFinalClose > 0 ? "warn" : "ok")">
+        <div class="kpi-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" /><path d="M9 12l2 2 4-4" /></svg></div>
+        <div>
+            <div class="l">Awaiting final close</div>
+            <div class="n">@Model.AwaitingFinalClose</div>
+            <div class="h">@(Model.AwaitingFinalClose > 0 ? "Closed by the department" : "Nothing to close")</div>
+        </div>
+    </div>
 </section>
 
 <div class="row-2">
@@ -123,6 +131,63 @@
         }
     </section>
 </div>
+
+<section class="panel" style="margin-bottom:20px">
+    <div class="panel-head">
+        <h2>Final close</h2>
+        <a href="@Url.Action("Closures", "Operation", new { status = "closing" })">View all</a>
+    </div>
+
+    @if (!Model.FinalCloseList.Any())
+    {
+        <div class="empty">No jobs are waiting for the final close. Jobs appear here once a department closes them.</div>
+    }
+    else
+    {
+        <div class="table-wrap">
+            <table class="table-fixed cards">
+                <colgroup>
+                    <col style="width:12%" />
+                    <col style="width:16%" />
+                    <col style="width:20%" />
+                    <col style="width:22%" />
+                    <col style="width:12%" />
+                    <col style="width:18%" />
+                </colgroup>
+                <thead>
+                    <tr><th>Permit no</th><th>Department</th><th>Work location</th><th>Safety Steward</th><th>Closed on</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in Model.FinalCloseList)
+                    {
+                        <tr>
+                            <td class="no" data-label="Permit no">@t.PermitNo</td>
+                            <td data-label="Department">@t.DepartmentName</td>
+                            <td data-label="Work location">@t.WorkLocation</td>
+                            <td data-label="Safety Steward">
+                                <strong>@t.SafetyStewardName</strong>
+                                @if (!string.IsNullOrEmpty(t.SafetyStewardMobile))
+                                {
+                                    <div class="muted">@t.SafetyStewardMobile</div>
+                                }
+                            </td>
+                            <td class="date" data-label="Closed on">@(t.ClosedOn.HasValue ? t.ClosedOn.Value.ToString("dd MMM yyyy") : "")</td>
+                            <td class="act">
+                                @using (Html.BeginForm("FinalClose", "Operation", FormMethod.Post, new { @class = "inline-form", onsubmit = "return confirm('Final close this job? This cannot be undone.');" }))
+                                {
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="taskId" value="@t.TaskId" />
+                                    <input type="hidden" name="returnTo" value="dashboard" />
+                                    <button type="submit" class="act-btn danger">Final close</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
 
 <section class="panel">
     <div class="panel-head">

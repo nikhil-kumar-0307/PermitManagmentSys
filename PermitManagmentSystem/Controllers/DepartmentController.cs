@@ -20,7 +20,7 @@ namespace PermitManagmentSystem.Controllers
 
         private int _deptId;   // the logged-in user's department (Departments.Id in QMS)
 
-        // Same folder the Operation side saves attachments in - change if yours is different
+        
         private const string AttachmentFolder = "~/App_Data/Permits/";
 
         // ---------- who is this user? ----------
@@ -37,8 +37,6 @@ namespace PermitManagmentSystem.Controllers
             _deptId = id;
             ViewBag.DepartmentName = QmsDbContext.NameOf(_qms.GetDepartmentNames(), _deptId);
         }
-
-        // Reads the DepartmentId that AccountController.SignIn stored in the auth ticket (4th part of userData)
         private bool TryGetDepartmentId(out int id)
         {
             id = 0;
@@ -58,8 +56,6 @@ namespace PermitManagmentSystem.Controllers
         {
             return RedirectToAction("Dashboard");
         }
-
-        // ---------- shared query: permit rows with their task info ----------
         private IQueryable<DepartmentPermitRowDto> ToRows(IQueryable<Permit> permits)
         {
             return permits.Select(p => new DepartmentPermitRowDto
@@ -277,8 +273,7 @@ namespace PermitManagmentSystem.Controllers
             {
                 FillPermitInfo(model, permit);
                 model.IsEdit = task != null;
-                model.IsLocked = false;
-                // keep what the user typed so nothing is lost
+                model.IsLocked = false;                
                 model.Workers = workers.Count == 0 ? new List<WorkerInputDto> { new WorkerInputDto() } : workers;
                 // the view reads values from the model, so clear stale posted values
                 ModelState.Remove("Workers");
@@ -293,7 +288,7 @@ namespace PermitManagmentSystem.Controllers
             else
             {
                 task.UpdatedOn = DateTime.Now;
-                _db.PermitWorkers.RemoveRange(task.Workers.ToList());   // replace the worker list
+                _db.PermitWorkers.RemoveRange(task.Workers.ToList());  
             }
 
             task.SupervisorName = model.SupervisorName.Trim();
@@ -330,7 +325,7 @@ namespace PermitManagmentSystem.Controllers
                 task.ClosedOn = DateTime.Now;
                 task.ClosedBy = User.Identity.Name;
                 _db.SaveChanges();
-                TempData["Flash"] = "Permit " + permit.PermitNo + " is closed and sent to Safety for the final close.";
+                TempData["Flash"] = "Permit " + permit.PermitNo + " is closed and sent to Operation for the final close.";
             }
 
             if (returnTo == "dashboard") return RedirectToAction("Dashboard");

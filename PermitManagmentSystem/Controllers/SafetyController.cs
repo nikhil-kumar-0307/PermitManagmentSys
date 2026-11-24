@@ -11,15 +11,14 @@ using PermitManagmentSystem.Models.DTOs;
 
 namespace PermitManagmentSystem.Controllers
 {
-    // Safety sees the work saved by EVERY department, records the Safety Steward,
-    // and does the final close after the department has closed the job.
+    // Safety sees the work saved by EVERY department and records the Safety Steward.
+    // The final close is done by Operation, not Safety.
     [Authorize(Roles = AppRoles.Safety)]
     public class SafetyController : Controller
     {
         private readonly ApplicationDbContext _db = new ApplicationDbContext();
         private readonly QmsDbContext _qms = new QmsDbContext();
 
-        // Same folder the Operation side saves attachments in - change if yours is different
         private const string AttachmentFolder = "~/App_Data/Permits/";
 
         private static readonly Regex MobileRx = new Regex(@"^\+?[0-9\s\-]{10,15}$");
@@ -44,8 +43,7 @@ namespace PermitManagmentSystem.Controllers
                 WorkerCount = t.Workers.Count(),
                 SafetyStewardName = t.SafetyStewardName,
                 SafetyStewardMobile = t.SafetyStewardMobile,
-                ClosedOn = t.ClosedOn,
-                FinalClosedOn = t.FinalClosedOn
+                ClosedOn = t.ClosedOn
             });
         }
 
@@ -65,18 +63,10 @@ namespace PermitManagmentSystem.Controllers
                 AwaitingSteward = awaiting,
                 StewardAssigned = total - awaiting,
                 WorkersOnPermits = _db.PermitWorkers.Count(),
-                AwaitingFinalClose = _db.PermitTasks.Count(t => t.ClosedOn != null && t.FinalClosedOn == null),
-                FinalClosed = _db.PermitTasks.Count(t => t.FinalClosedOn != null),
 
                 LatestAwaiting = ToRows(_db.PermitTasks
                         .Where(t => t.SafetyStewardName == null)
                         .OrderByDescending(t => t.CreatedOn).ThenByDescending(t => t.Id)
-                        .Take(10))
-                    .ToList(),
-
-                FinalCloseList = ToRows(_db.PermitTasks
-                        .Where(t => t.ClosedOn != null && t.FinalClosedOn == null)
-                        .OrderByDescending(t => t.ClosedOn).ThenByDescending(t => t.Id)
                         .Take(10))
                     .ToList(),
 
@@ -91,8 +81,6 @@ namespace PermitManagmentSystem.Controllers
             };
 
             foreach (var r in model.LatestAwaiting)
-                r.DepartmentName = QmsDbContext.NameOf(names, r.DepartmentId);
-            foreach (var r in model.FinalCloseList)
                 r.DepartmentName = QmsDbContext.NameOf(names, r.DepartmentId);
 
             // work saved by departments per day, last 30 days (empty days = 0)
@@ -111,7 +99,7 @@ namespace PermitManagmentSystem.Controllers
             return View(model);
         }
 
-        // GET: /Safety/Tasks?q=...&status=pending|done|closing|closed
+        // GET: /Safety/Tasks?q=...&status=pending|done
         public ActionResult Tasks(string q, string status)
         {
             var query = _db.PermitTasks.AsQueryable();
@@ -125,9 +113,7 @@ namespace PermitManagmentSystem.Controllers
             }
 
             if (status == "pending") query = query.Where(t => t.SafetyStewardName == null);
-            else if (status == "done") query = query.Where(t => t.SafetyStewardName != null && t.ClosedOn == null);
-            else if (status == "closing") query = query.Where(t => t.ClosedOn != null && t.FinalClosedOn == null);
-            else if (status == "closed") query = query.Where(t => t.FinalClosedOn != null);
+            else if (status == "done") query = query.Where(t => t.SafetyStewardName != null);
 
             var items = ToRows(query.OrderByDescending(t => t.CreatedOn).ThenByDescending(t => t.Id).Take(200)).ToList();
 
@@ -166,30 +152,6 @@ namespace PermitManagmentSystem.Controllers
             }
 
             if (returnTo == "tasks")
-                return RedirectToAction("Tasks", new { q = q, status = status });
-            return RedirectToAction("Dashboard");
-        }
-
-        // POST: /Safety/FinalClose - only after the department has closed the job
-        [HttpPost, ValidateAntiForgeryToken]
-        public ActionResult FinalClose(int taskId, string returnTo, string q, string status)
-        {
-            var task = _db.PermitTasks.Include(t => t.Permit).FirstOrDefault(t => t.Id == taskId);
-            if (task == null) return HttpNotFound();
-
-            if (task.FinalClosedOn != null)
-                TempData["Error"] = "Permit " + task.Permit.PermitNo + " is already final closed.";
-            else if (task.ClosedOn == null)
-                TempData["Error"] = "The department has not closed permit " + task.Permit.PermitNo + " yet.";
-            else
-            {
-                task.FinalClosedOn = DateTime.Now;
-                task.FinalClosedBy = User.Identity.Name;
-                _db.SaveChanges();
-                TempData["Flash"] = "Permit " + task.Permit.PermitNo + " is final closed.";
-            }
-
-            if (returnTo == "tasks" || returnTo == "steward")
                 return RedirectToAction("Tasks", new { q = q, status = status });
             return RedirectToAction("Dashboard");
         }
@@ -258,8 +220,6 @@ namespace PermitManagmentSystem.Controllers
             dto.IsEdit = t.SafetyStewardName != null;
             dto.IsClosed = t.ClosedOn != null;
             dto.ClosedOn = t.ClosedOn;
-            dto.IsFinalClosed = t.FinalClosedOn != null;
-            dto.FinalClosedOn = t.FinalClosedOn;
             dto.PermitId = p.Id;
             dto.PermitNo = p.PermitNo;
             dto.DepartmentName = QmsDbContext.NameOf(_qms.GetDepartmentNames(), p.DepartmentId);

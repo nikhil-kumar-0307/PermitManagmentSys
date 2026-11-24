@@ -10,11 +10,8 @@ namespace PermitManagmentSystem.Models.DTOs
         public int AwaitingSteward { get; set; }
         public int StewardAssigned { get; set; }
         public int WorkersOnPermits { get; set; }
-        public int AwaitingFinalClose { get; set; }   // department closed, Safety must final close
-        public int FinalClosed { get; set; }
 
         public List<SafetyTaskRowDto> LatestAwaiting { get; set; } = new List<SafetyTaskRowDto>();
-        public List<SafetyTaskRowDto> FinalCloseList { get; set; } = new List<SafetyTaskRowDto>();
         public List<DepartmentCountDto> ByDepartment { get; set; } = new List<DepartmentCountDto>();
         public List<DayCountDto> LastDays { get; set; } = new List<DayCountDto>();
     }
@@ -34,19 +31,16 @@ namespace PermitManagmentSystem.Models.DTOs
         public string SafetyStewardName { get; set; }
         public string SafetyStewardMobile { get; set; }
         public DateTime? ClosedOn { get; set; }          // closed by the department
-        public DateTime? FinalClosedOn { get; set; }     // final closed by Safety
 
         public bool HasSteward { get { return !string.IsNullOrEmpty(SafetyStewardName); } }
-        public bool IsClosed { get { return ClosedOn.HasValue; } }                       // department closed
-        public bool IsFinalClosed { get { return FinalClosedOn.HasValue; } }
-        public bool CanFinalClose { get { return ClosedOn.HasValue && !FinalClosedOn.HasValue; } }
+        public bool IsClosed { get { return ClosedOn.HasValue; } }
     }
 
     public class SafetyTaskListDto
     {
         public List<SafetyTaskRowDto> Items { get; set; } = new List<SafetyTaskRowDto>();
         public string Query { get; set; }
-        public string Status { get; set; }   // "", "pending", "done", "closing", "closed"
+        public string Status { get; set; }   // "", "pending", "done"
     }
 
     // read-only worker shown to Safety
@@ -76,14 +70,9 @@ namespace PermitManagmentSystem.Models.DTOs
         public List<SafetyWorkerDto> Workers { get; set; } = new List<SafetyWorkerDto>();
         public bool IsEdit { get; set; }
 
-        // department has closed the job - Safety can only view it or final close it
+        // department has closed the job - Safety can only view it
         public bool IsClosed { get; set; }
         public DateTime? ClosedOn { get; set; }
-
-        // Safety has done the final close
-        public bool IsFinalClosed { get; set; }
-        public DateTime? FinalClosedOn { get; set; }
-        public bool CanFinalClose { get { return IsClosed && !IsFinalClosed; } }
 
         // ---- the fields Safety fills ----
         [Required(ErrorMessage = "Safety steward is required")]

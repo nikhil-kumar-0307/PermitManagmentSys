@@ -11,7 +11,6 @@ using PermitManagmentSystem.Models.DTOs;
 namespace PermitManagmentSystem.Controllers
 {
     // All permit work is done by the Operation login only.
-    // To let SuperAdmin in too:  [Authorize(Roles = AppRoles.Operation + "," + AppRoles.SuperAdmin)]
     [Authorize(Roles = AppRoles.Operation)]
     public class PermitsController : Controller
     {
@@ -289,9 +288,8 @@ namespace PermitManagmentSystem.Controllers
                 .ToList();
         }
 
-        // ---------------------------------------------------------------- file helpers
-        // Files live in App_Data, which IIS never serves directly,
-        // so they can only be opened through Download() above (login required).
+        // ---------------------------------------------------------------- file helpers 
+       
         private string UploadFolder()
         {
             var folder = Server.MapPath("~/App_Data/PermitAttachments");
