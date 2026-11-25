@@ -3,12 +3,13 @@ using System.Data.Entity;
 using System.Linq;
 using System.Web.Mvc;
 using PermitManagmentSystem.Data;
+using PermitManagmentSystem.Filters;
 using PermitManagmentSystem.Models;
 using PermitManagmentSystem.Models.DTOs;
 
 namespace PermitManagmentSystem.Controllers
 {
-    [Authorize(Roles = AppRoles.Operation)]
+    [RoleAuthorize(Roles = AppRoles.Operation)]
     public class OperationController : Controller
     {
         private readonly ApplicationDbContext _db = new ApplicationDbContext();

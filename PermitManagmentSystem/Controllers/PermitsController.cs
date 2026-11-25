@@ -5,13 +5,14 @@ using System.Linq;
 using System.Web;
 using System.Web.Mvc;
 using PermitManagmentSystem.Data;
+using PermitManagmentSystem.Filters;
 using PermitManagmentSystem.Models;
 using PermitManagmentSystem.Models.DTOs;
 
 namespace PermitManagmentSystem.Controllers
 {
     // All permit work is done by the Operation login only.
-    [Authorize(Roles = AppRoles.Operation)]
+    [RoleAuthorize(Roles = AppRoles.Operation)]
     public class PermitsController : Controller
     {
         private readonly ApplicationDbContext _db = new ApplicationDbContext();

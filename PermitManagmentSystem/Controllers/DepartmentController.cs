@@ -7,12 +7,13 @@ using System.Web;
 using System.Web.Mvc;
 using System.Web.Security;
 using PermitManagmentSystem.Data;
+using PermitManagmentSystem.Filters;
 using PermitManagmentSystem.Models;
 using PermitManagmentSystem.Models.DTOs;
 
 namespace PermitManagmentSystem.Controllers
 {
-    [Authorize(Roles = AppRoles.Department)]
+    [RoleAuthorize(Roles = AppRoles.Department)]
     public class DepartmentController : Controller
     {
         private readonly ApplicationDbContext _db = new ApplicationDbContext();

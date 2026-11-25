@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Web;
 using System.Web.Mvc;
 using PermitManagmentSystem.Data;
+using PermitManagmentSystem.Filters;
 using PermitManagmentSystem.Models;
 using PermitManagmentSystem.Models.DTOs;
 
@@ -13,7 +14,7 @@ namespace PermitManagmentSystem.Controllers
 {
     // Safety sees the work saved by EVERY department and records the Safety Steward.
     // The final close is done by Operation, not Safety.
-    [Authorize(Roles = AppRoles.Safety)]
+    [RoleAuthorize(Roles = AppRoles.Safety)]
     public class SafetyController : Controller
     {
         private readonly ApplicationDbContext _db = new ApplicationDbContext();

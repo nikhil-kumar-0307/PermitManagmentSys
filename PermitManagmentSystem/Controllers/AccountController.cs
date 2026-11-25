@@ -11,7 +11,6 @@ namespace PermitManagmentSystem.Controllers
 {
     public class AccountController : Controller
     {
-
         private readonly ApplicationDbContext _db = new ApplicationDbContext();
         private readonly QmsDbContext _qms = new QmsDbContext();   // read-only, used to find a department's id by name
 
@@ -20,7 +19,14 @@ namespace PermitManagmentSystem.Controllers
         public ActionResult Login(string returnUrl)
         {
             if (User.Identity.IsAuthenticated)
-                return RedirectToLocal(returnUrl, GetRole());
+            {
+                var role = GetRole();
+                if (role != null)
+                    return RedirectToRoleHome(role);   // ignore returnUrl: it may be another role's page (this caused the loop)
+
+                // signed in but the role is not one of the three -> clear the bad cookie
+                FormsAuthentication.SignOut();
+            }
 
             ViewBag.ReturnUrl = returnUrl;
             return View(new LoginDto());
@@ -42,7 +48,7 @@ namespace PermitManagmentSystem.Controllers
                 .Where(u => u.Username == username)
                 .ToList()
                 .FirstOrDefault(u => string.Equals(u.Password, password, StringComparison.Ordinal));
-            
+
             if (user == null)
             {
                 ModelState.AddModelError("", "Username or password is incorrect.");
@@ -57,9 +63,20 @@ namespace PermitManagmentSystem.Controllers
                 return View(model);
             }
 
+            // Only the three known roles can sign in
+            var roleName = (user.Role ?? "").Trim();
+            if (!string.Equals(roleName, AppRoles.Operation, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(roleName, AppRoles.Department, StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(roleName, AppRoles.Safety, StringComparison.OrdinalIgnoreCase))
+            {
+                ModelState.AddModelError("", "This account has no valid role. Contact your administrator.");
+                model.Password = null;
+                return View(model);
+            }
+
             // A department login: find its department in QMS by name.
             int? departmentId = null;
-            if (string.Equals((user.Role ?? "").Trim(), AppRoles.Department, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(roleName, AppRoles.Department, StringComparison.OrdinalIgnoreCase))
             {
                 departmentId = _qms.FindDepartmentId(user.DepartmentName);
                 if (!departmentId.HasValue)
@@ -75,14 +92,13 @@ namespace PermitManagmentSystem.Controllers
 
             // MULTI-DEVICE LOGIN:
             // Each sign-in creates its own independent auth cookie on that browser/device.
-            // Nothing is stored on the server that limits a user to one session,
-            // so the same user can be signed in on any number of devices at once.
+            // Nothing is stored on the server that limits a user to one session.
             SignIn(user, model.RememberMe, departmentId);
 
-            return RedirectToLocal(returnUrl, user.Role);
+            return RedirectToLocal(returnUrl, roleName);
         }
 
-        // POST: /Account/Logout  (signs out this device only - other devices stay signed in)
+        // POST: /Account/Logout  (signs out this device only)
         [HttpPost, ValidateAntiForgeryToken]
         public ActionResult Logout()
         {
@@ -99,11 +115,10 @@ namespace PermitManagmentSystem.Controllers
             var expires = remember ? now.AddDays(14) : now.AddHours(8);
 
             // userData = Id|Role|FullName|DepartmentId   (DepartmentId is empty for non-department users)
-            // The first three parts are unchanged, so the existing Global.asax keeps working.
             var userData = string.Format("{0}|{1}|{2}|{3}",
                 user.Id,
                 (user.Role ?? "").Trim(),
-                user.FullName.Replace("|", " "),
+                (user.FullName ?? "").Replace("|", " "),
                 departmentId.HasValue ? departmentId.Value.ToString() : "");
 
             var ticket = new FormsAuthenticationTicket(
@@ -115,7 +130,7 @@ namespace PermitManagmentSystem.Controllers
                 Secure = Request.IsSecureConnection,
                 Path = FormsAuthentication.FormsCookiePath
             };
-            if (remember) cookie.Expires = expires;   // persistent cookie only when "Remember me" is ticked
+            if (remember) cookie.Expires = expires;   // persistent cookie only when "Keep me signed in" is ticked
 
             Response.Cookies.Add(cookie);
         }
@@ -128,11 +143,9 @@ namespace PermitManagmentSystem.Controllers
             return null;
         }
 
-        private ActionResult RedirectToLocal(string returnUrl, string role)
+        // Used by Login GET when the user is already signed in
+        private ActionResult RedirectToRoleHome(string role)
         {
-            if (!string.IsNullOrEmpty(returnUrl) && returnUrl != "/" && Url.IsLocalUrl(returnUrl))
-                return Redirect(returnUrl);
-
             var r = (role ?? "").Trim();
 
             if (string.Equals(r, AppRoles.Operation, StringComparison.OrdinalIgnoreCase))
@@ -144,7 +157,16 @@ namespace PermitManagmentSystem.Controllers
             if (string.Equals(r, AppRoles.Safety, StringComparison.OrdinalIgnoreCase))
                 return RedirectToAction("Dashboard", "Safety");
 
-            return RedirectToAction("Index", "Home");
+            return RedirectToAction("Login", "Account");
+        }
+
+        // Used by Login POST right after a successful sign-in
+        private ActionResult RedirectToLocal(string returnUrl, string role)
+        {
+            if (!string.IsNullOrEmpty(returnUrl) && returnUrl != "/" && Url.IsLocalUrl(returnUrl))
+                return Redirect(returnUrl);
+
+            return RedirectToRoleHome(role);
         }
 
         protected override void Dispose(bool disposing)
